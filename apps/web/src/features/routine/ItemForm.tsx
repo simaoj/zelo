@@ -6,6 +6,7 @@ import { useZelo } from '@/shared/data/ZeloProvider';
 import { useTimeZone } from '@/shared/data/session';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { uuid } from '@/shared/lib/ids';
 import { listTimeZones, todayIn, WEEKDAY_LONG, WEEKDAY_SHORT } from '@/shared/lib/time';
 import { Button } from '@/shared/ui/Button';
@@ -24,6 +25,7 @@ export function ItemForm({ item, onDone, onCancel, onConflict }: { item?: Routin
   const zones = useMemo(() => listTimeZones(), []);
   const [f, setF] = useState<ItemFormState>(() => (item ? itemToForm(item, todayIn(tz), tz) : emptyItemForm(todayIn(tz), tz)));
   const [errors, setErrors] = useState<ItemErrors>({});
+  const guard = useDirtyGuard();
   const set = <K extends keyof ItemFormState>(k: K, v: ItemFormState[K]) => setF((s) => ({ ...s, [k]: v }));
 
   const built = buildItemPayload(f);
@@ -78,6 +80,7 @@ export function ItemForm({ item, onDone, onCancel, onConflict }: { item?: Routin
     );
     if (result) {
       intent.reset();
+      guard.clear();
       onDone(result);
     }
   };
@@ -86,7 +89,9 @@ export function ItemForm({ item, onDone, onCancel, onConflict }: { item?: Routin
   const fieldErr = (k: keyof ItemFormState, ...server: string[]) => errors[k] ?? server.map((s) => fe[s]?.[0]).find(Boolean);
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form
+      onChange={guard.markDirty}
+      data-zelo-editing={guard.dirty || undefined} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <TextField label="Nome" required maxLength={120} value={f.name} onChange={(e) => set('name', e.target.value)} error={fieldErr('name', 'name')} data-autofocus />
       <SelectField label="Tipo" required value={f.type} onChange={(e) => set('type', e.target.value as RoutineType)}>
         {ROUTINE_TYPES.map((t) => (

@@ -9,6 +9,7 @@ import { useTimeZone } from '@/shared/data/session';
 import { useResource } from '@/shared/data/hooks';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { Button } from '@/shared/ui/Button';
 import { FormError, SelectField, TextAreaField } from '@/shared/ui/Field';
 import { DateTimeFields, nowInTz, resolveInstant } from '@/shared/ui/DateTimeFields';
@@ -26,6 +27,7 @@ export function AdHocIntakeForm({ onDone, defaultItemId }: { onDone: (m: Mutatio
   const [when, setWhen] = useState(() => nowInTz(tz));
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<{ item?: string; when?: string }>({});
+  const guard = useDirtyGuard();
 
   if (items.loading && !items.data) return <LoadingState />;
   if (items.error) return <ErrorState error={items.error} onRetry={items.reload} />;
@@ -58,12 +60,15 @@ export function AdHocIntakeForm({ onDone, defaultItemId }: { onDone: (m: Mutatio
       intent.reset();
       setNotes('');
       setWhen(nowInTz(tz));
+      guard.clear();
       onDone(r);
     }
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form
+      onChange={guard.markDirty}
+      data-zelo-editing={guard.dirty || undefined} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <SelectField label="Item" required value={itemId} onChange={(e) => setItemId(e.target.value)} error={errors.item}>
         <option value="">Selecione…</option>
         {active.map((it) => (

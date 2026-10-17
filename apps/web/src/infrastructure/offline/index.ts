@@ -11,6 +11,7 @@ import {
   type OfflineLayerOptions,
   type OfflineSyncPort,
 } from './layer';
+import { registerServiceWorker } from '@/pwa/sw-client';
 
 export interface OfflineDataLayer {
   data: ZeloDataSource;
@@ -21,6 +22,8 @@ export interface OfflineDataLayer {
 
 export function createOfflineDataLayer(http: ZeloDataSource, auth: AuthPort, options?: OfflineLayerOptions): OfflineDataLayer & { sync: OfflineSyncPort } {
   const rt = new OfflineRuntime(http, auth, options);
+  // the composition root runs on every page (incl. sign-in): register the SW as early as possible
+  if (typeof window !== 'undefined' && options?.installListeners !== false) void registerServiceWorker();
   return { data: createOfflineDataSource(rt), sync: createOfflineSyncPort(rt), auth: createOfflineAuth(rt) };
 }
 

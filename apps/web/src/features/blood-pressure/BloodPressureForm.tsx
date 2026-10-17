@@ -7,6 +7,7 @@ import { useZelo } from '@/shared/data/ZeloProvider';
 import { useTimeZone } from '@/shared/data/session';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { fieldError } from '@/shared/data/errors';
 import { Button } from '@/shared/ui/Button';
 import { FormError, TextAreaField, TextField } from '@/shared/ui/Field';
@@ -38,6 +39,7 @@ export function BloodPressureForm({
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [errors, setErrors] = useState<Partial<Record<keyof BpInput | 'when', string>>>({});
   const [confirming, setConfirming] = useState(false);
+  const guard = useDirtyGuard();
 
   const set = (k: keyof BpInput) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues((v) => ({ ...v, [k]: e.target.value }));
@@ -79,6 +81,7 @@ export function BloodPressureForm({
         setNotes('');
         setWhen(nowInTz(tz));
       }
+      guard.clear();
       onDone(result);
     }
   };
@@ -90,6 +93,8 @@ export function BloodPressureForm({
 
   return (
     <form
+      onChange={guard.markDirty}
+      data-zelo-editing={guard.dirty || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void send(false);

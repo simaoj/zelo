@@ -7,6 +7,7 @@ import { useZelo } from '@/shared/data/ZeloProvider';
 import { useTimeZone } from '@/shared/data/session';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { Button } from '@/shared/ui/Button';
 import { FormError, TextAreaField } from '@/shared/ui/Field';
 import { DateTimeFields, fromInstant, nowInTz, resolveInstant } from '@/shared/ui/DateTimeFields';
@@ -36,6 +37,7 @@ export function MeasurementForm({
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | undefined>();
   const [whenError, setWhenError] = useState<string | undefined>();
+  const guard = useDirtyGuard();
 
   const update = (key: string, patch: Partial<MeasurementRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
@@ -83,12 +85,15 @@ export function MeasurementForm({
         setNotes('');
         setWhen(nowInTz(tz));
       }
+      guard.clear();
       onDone(result);
     }
   };
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form
+      onChange={guard.markDirty}
+      data-zelo-editing={guard.dirty || undefined} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm text-ink-muted">Preencha só as medidas que fez agora (em cm). Campos vazios não são salvos.</legend>
         {rows.map((row, idx) => {

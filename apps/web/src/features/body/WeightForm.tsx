@@ -7,6 +7,7 @@ import { useZelo } from '@/shared/data/ZeloProvider';
 import { useTimeZone } from '@/shared/data/session';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { fieldError } from '@/shared/data/errors';
 import { normalizeDecimal } from '@/shared/lib/decimal';
 import { Button } from '@/shared/ui/Button';
@@ -33,6 +34,7 @@ export function WeightForm({
   const [when, setWhen] = useState(() => (entry ? fromInstant(entry.measuredAt, entry.timezone) : nowInTz(tz)));
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [errors, setErrors] = useState<{ weight?: string; when?: string; notes?: string }>({});
+  const guard = useDirtyGuard();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,13 +77,16 @@ export function WeightForm({
         setNotes('');
         setWhen(nowInTz(tz));
       }
+      guard.clear();
       onDone(result);
     }
   };
 
   const fe = error?.fieldErrors ?? {};
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form
+      onChange={guard.markDirty}
+      data-zelo-editing={guard.dirty || undefined} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <TextField
         label="Peso (kg)"
         required
