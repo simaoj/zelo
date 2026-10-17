@@ -1,0 +1,18 @@
+# Shared by apps/api/Dockerfile and apps/web/Dockerfile (build context = repo root)
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/.turbo
+.git
+.github
+.env
+.env.*
+!.env.example
+**/.DS_Store
+stitch_*
+/*.png
+/*.pdf
+playwright-report
+test-results
