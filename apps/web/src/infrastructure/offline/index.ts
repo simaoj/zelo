@@ -1,8 +1,16 @@
 /**
- * Offline-first data layer (owned by the PWA agent).
- * STUB: passes through to HTTP until implemented. Signature is fixed — the composition root calls it.
+ * Offline-first data layer (owned by the PWA agent). The composition root calls
+ * `createOfflineDataLayer(http, auth)` and uses ONLY the returned { data, sync, auth }.
  */
-import type { AuthPort, SyncPort, SyncStatus, ZeloDataSource } from '@/shared/data/ports';
+import type { AuthPort, SyncPort, ZeloDataSource } from '@/shared/data/ports';
+import {
+  OfflineRuntime,
+  createOfflineAuth,
+  createOfflineDataSource,
+  createOfflineSyncPort,
+  type OfflineLayerOptions,
+  type OfflineSyncPort,
+} from './layer';
 
 export interface OfflineDataLayer {
   data: ZeloDataSource;
@@ -11,28 +19,20 @@ export interface OfflineDataLayer {
   auth: AuthPort;
 }
 
-export function createOfflineDataLayer(http: ZeloDataSource, auth: AuthPort): OfflineDataLayer {
-  const status: SyncStatus = {
-    online: typeof navigator === 'undefined' ? true : navigator.onLine,
-    offlineEnabled: false,
-    lastSyncedAt: null,
-    pendingCount: 0,
-    conflictCount: 0,
-    errorCount: 0,
-    syncing: false,
-    needsReauth: false,
-  };
-  const sync: SyncPort = {
-    getStatus: () => status,
-    subscribeStatus: () => () => {},
-    syncNow: async () => {},
-    enableOffline: async () => {},
-    disableOffline: async () => {},
-    listProblemOperations: async () => [],
-    resolveKeepRemote: async () => {},
-    resolveReapplyLocal: async () => {},
-    discardOperation: async () => {},
-    clearLocalData: async () => {},
-  };
-  return { data: http, sync, auth };
+export function createOfflineDataLayer(http: ZeloDataSource, auth: AuthPort, options?: OfflineLayerOptions): OfflineDataLayer & { sync: OfflineSyncPort } {
+  const rt = new OfflineRuntime(http, auth, options);
+  return { data: createOfflineDataSource(rt), sync: createOfflineSyncPort(rt), auth: createOfflineAuth(rt) };
 }
+
+export {
+  SignOutCancelledError,
+  isSignOutCancelled,
+  isOfflineSync,
+  type OfflineLayerOptions,
+  type OfflineSyncPort,
+  type SignOutChoice,
+  type SignOutHandler,
+  type SignOutPrompt,
+} from './layer';
+export { createFetchSyncApi, type SyncApi } from './api';
+export { DeviceFlags } from './flags';
