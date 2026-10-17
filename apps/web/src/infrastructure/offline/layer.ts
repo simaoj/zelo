@@ -684,8 +684,10 @@ export class OfflineRuntime {
         await db.operations.update(op.seq!, { state: 'pending', lastError: null, remote: null, chained: false });
       }
     } else {
-      const payload = { ...op.payload, expectedVersion: remote.version };
-      await db.operations.update(op.seq!, { payload, expectedVersion: remote.version, state: 'pending', lastError: null, chained: false });
+      // a re-apply is a NEW intent → new operationId (the old one is bound to the rejected payload)
+      const operationId = crypto.randomUUID();
+      const payload = { ...op.payload, operationId, expectedVersion: remote.version };
+      await db.operations.update(op.seq!, { operationId, payload, expectedVersion: remote.version, state: 'pending', lastError: null, chained: false });
     }
     // re-enable later ops of the entity that were held as conflicts behind this one
     const later = (await db.operations.where('entityId').equals(op.entityId).toArray()).filter((o) => o.seq! > op.seq! && o.state === 'conflict');

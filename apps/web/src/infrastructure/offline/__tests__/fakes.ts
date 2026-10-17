@@ -1,0 +1,290 @@
+import type {
+  Occurrence,
+  Profile,
+  SessionResponse,
+  SyncChange,
+  SyncOperation,
+  SyncOperationResult,
+  WeightEntry,
+  IntakeRecord,
+} from '@zelo/contracts';
+import { DataError, OfflineError, type AuthPort, type Mutation, type ZeloDataSource } from '@/shared/data/ports';
+import type { SyncApi } from '../api';
+import type { KeyValueStorage } from '../flags';
+
+export const U1 = '11111111-1111-4111-8111-111111111111';
+export const U2 = '22222222-2222-4222-8222-222222222222';
+
+export const uuid = () => crypto.randomUUID();
+
+export function memoryStorage(): KeyValueStorage & { map: Map<string, string> } {
+  const map = new Map<string, string>();
+  return { map, getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v), removeItem: (k) => void map.delete(k) };
+}
+
+export const session = (userId: string): SessionResponse => ({
+  user: { userId, email: `${userId.slice(0, 4)}@example.com` },
+  expiresAt: '2030-01-01T00:00:00.000Z',
+});
+
+const err = (status: number, code: DataError['body']['code'], extra: Partial<DataError['body']> = {}) => ({
+  code,
+  message: code,
+  correlationId: 'test',
+  ...extra,
+});
+
+/** In-memory server with idempotency, versions and a per-user change log. */
+export class FakeServer {
+  online = true;
+  sessionUser: string | null = U1;
+  weights = new Map<string, WeightEntry>();
+  occurrences = new Map<string, Occurrence>();
+  log: Array<{ seq: number; change: SyncChange }> = [];
+  seq = 0;
+  idem = new Map<string, { payload: string; result: SyncOperationResult }>();
+  operationCalls: SyncOperation[][] = [];
+  applied = 0;
+  /** next /sync/operations call: process then drop the response */
+  loseNextResponse = false;
+  /** next /sync/operations answer for every op */
+  forceStatus: number | null = null;
+  signOutCalls = 0;
+  pushDeletes: string[] = [];
+
+  profile(): Profile {
+    return {
+      userId: this.sessionUser ?? U1,
+      displayName: 'Ana',
+      timezone: 'America/Sao_Paulo',
+      visibleModules: ['body', 'bloodPressure', 'routine'],
+      remindersEnabled: true,
+      version: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  private bump(change: SyncChange) {
+    this.log.push({ seq: ++this.seq, change });
+  }
+
+  /** "other device" edits */
+  upsertWeight(w: WeightEntry) {
+    this.weights.set(w.id, w);
+    this.bump({ op: 'upsert', entity: 'weightEntry', id: w.id, data: w });
+  }
+  deleteWeight(id: string) {
+    this.weights.delete(id);
+    this.bump({ op: 'delete', entity: 'weightEntry', id });
+  }
+
+  process(op: SyncOperation): SyncOperationResult {
+    const p = op.payload as { operationId: string; expectedVersion?: number } & Record<string, unknown>;
+    const key = JSON.stringify(p);
+    const prev = this.idem.get(p.operationId);
+    if (prev) {
+      if (prev.payload !== key) return { operationId: p.operationId, status: 409, error: err(409, 'IDEMPOTENCY_CONFLICT') };
+      return prev.result;
+    }
+    const result = this.apply(op, p);
+    if (result.status < 500) this.idem.set(p.operationId, { payload: key, result });
+    return result;
+  }
+
+  private apply(op: SyncOperation, p: { operationId: string; expectedVersion?: number } & Record<string, unknown>): SyncOperationResult {
+    const id = op.entityId;
+    const now = new Date().toISOString();
+    const ok = (body: unknown, status = 200): SyncOperationResult => {
+      this.applied++;
+      return { operationId: p.operationId, status, body };
+    };
+    switch (op.type) {
+      case 'weight.create': {
+        if (typeof p.weightKg !== 'string' || !/^\d+(\.\d{1,2})?$/.test(p.weightKg))
+          return { operationId: p.operationId, status: 422, error: err(422, 'VALIDATION_ERROR') };
+        const w: WeightEntry = {
+          id,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+          measuredAt: p.measuredAt as string,
+          timezone: p.timezone as string,
+          weightKg: p.weightKg,
+          notes: (p.notes as string | null | undefined) ?? null,
+          deltaKg: null,
+        };
+        this.upsertWeight(w);
+        return ok(w, 201);
+      }
+      case 'weight.update': {
+        const cur = this.weights.get(id);
+        if (!cur) return { operationId: p.operationId, status: 404, error: err(404, 'NOT_FOUND') };
+        if (cur.version !== p.expectedVersion)
+          return { operationId: p.operationId, status: 409, error: err(409, 'VERSION_CONFLICT', { current: cur }) };
+        const { operationId: _o, expectedVersion: _e, ...fields } = p;
+        void _o;
+        void _e;
+        const next = { ...cur, ...fields, version: cur.version + 1, updatedAt: now } as WeightEntry;
+        this.upsertWeight(next);
+        return ok(next);
+      }
+      case 'weight.delete': {
+        const cur = this.weights.get(id);
+        if (!cur) return { operationId: p.operationId, status: 404, error: err(404, 'NOT_FOUND') };
+        if (cur.version !== p.expectedVersion)
+          return { operationId: p.operationId, status: 409, error: err(409, 'VERSION_CONFLICT', { current: cur }) };
+        this.deleteWeight(id);
+        return ok(undefined, 204);
+      }
+      case 'occurrence.intake.put': {
+        const occ = this.occurrences.get(id)!;
+        if (occ.intake && occ.intake.version !== p.expectedVersion)
+          return { operationId: p.operationId, status: 409, error: err(409, 'VERSION_CONFLICT', { current: occ.intake }) };
+        const rec: IntakeRecord = {
+          id: occ.intake?.id ?? (p.intakeId as string),
+          version: (occ.intake?.version ?? 0) + 1,
+          createdAt: now,
+          updatedAt: now,
+          itemId: occ.itemId,
+          occurrenceId: occ.id,
+          status: p.status as IntakeRecord['status'],
+          actualTakenAt: p.actualTakenAt as string | null,
+          notes: null,
+          nameSnapshot: occ.nameSnapshot,
+          doseSnapshot: occ.doseSnapshot,
+          unitSnapshot: occ.unitSnapshot,
+        };
+        this.occurrences.set(id, { ...occ, intake: rec, state: rec.status });
+        this.bump({ op: 'upsert', entity: 'intakeRecord', id: rec.id, data: rec });
+        return ok(rec);
+      }
+      default:
+        return { operationId: p.operationId, status: 400, error: err(400, 'VALIDATION_ERROR') };
+    }
+  }
+
+  private guard() {
+    if (!this.online) throw new OfflineError();
+    if (!this.sessionUser) throw new DataError(401, err(401, 'UNAUTHENTICATED'));
+  }
+
+  api: SyncApi = {
+    bootstrap: async () => {
+      this.guard();
+      return {
+        cursor: String(this.seq),
+        profile: this.profile(),
+        weightEntries: [...this.weights.values()],
+        weightGoal: null,
+        measurementSessions: [],
+        bloodPressureEntries: [],
+        routineItems: [],
+        occurrences: [...this.occurrences.values()],
+        intakeRecords: [],
+      };
+    },
+    changes: async (cursor) => {
+      this.guard();
+      const n = Number(cursor);
+      return { changes: this.log.filter((l) => l.seq > n).map((l) => l.change), cursor: String(this.seq), hasMore: false };
+    },
+    operations: async (ops) => {
+      this.guard();
+      this.operationCalls.push(ops.map((o) => structuredClone(o)));
+      if (this.forceStatus) {
+        const s = this.forceStatus;
+        return { results: ops.map((o) => ({ operationId: (o.payload as { operationId: string }).operationId, status: s, error: err(s, s === 401 ? 'UNAUTHENTICATED' : 'INTERNAL_ERROR') })) };
+      }
+      const results = ops.map((o) => this.process(o));
+      if (this.loseNextResponse) {
+        this.loseNextResponse = false;
+        throw new OfflineError();
+      }
+      return { results };
+    },
+    pushConfig: async () => ({ vapidPublicKey: null }),
+    pushSubscribe: async () => ({ id: uuid(), deviceId: uuid(), createdAt: new Date().toISOString() }),
+    pushUnsubscribe: async (id) => {
+      this.guard();
+      this.pushDeletes.push(id);
+    },
+  };
+
+  auth: AuthPort = {
+    getSession: async () => {
+      if (!this.online) throw new OfflineError();
+      return this.sessionUser ? session(this.sessionUser) : null;
+    },
+    signIn: async (input) => {
+      if (!this.online) throw new OfflineError();
+      this.sessionUser = input.email.startsWith('2222') ? U2 : U1;
+      return session(this.sessionUser);
+    },
+    signUp: async () => {
+      throw new Error('not used');
+    },
+    signOut: async () => {
+      if (!this.online) throw new OfflineError();
+      this.signOutCalls++;
+      this.sessionUser = null;
+    },
+    requestPasswordReset: async () => undefined,
+    confirmPasswordReset: async () => undefined,
+  };
+
+  /** HttpDataSource fake: direct (online) mutations go through the same idempotent processor. */
+  http(): ZeloDataSource {
+    const call = async <T>(op: SyncOperation): Promise<Mutation<T>> => {
+      this.guard();
+      const r = this.process(op);
+      if (r.status >= 300) throw new DataError(r.status, r.error!);
+      return { value: (r.body ?? null) as T, persistence: 'server' };
+    };
+    const notUsed = async (): Promise<never> => {
+      throw new Error('not used in tests');
+    };
+    return {
+      getProfile: async () => this.profile(),
+      updateProfile: notUsed,
+      getDashboard: notUsed,
+      listWeights: async () => ({ items: [...this.weights.values()], nextCursor: null }),
+      createWeight: (input) => call({ type: 'weight.create', entityId: input.id, payload: input }),
+      updateWeight: (id, input) => call({ type: 'weight.update', entityId: id, payload: input }),
+      deleteWeight: (id, input) => call({ type: 'weight.delete', entityId: id, payload: input }),
+      getWeightGoal: async () => null,
+      putWeightGoal: notUsed,
+      deleteWeightGoal: notUsed,
+      listMeasurements: notUsed,
+      createMeasurement: notUsed,
+      updateMeasurement: notUsed,
+      deleteMeasurement: notUsed,
+      listBloodPressure: notUsed,
+      createBloodPressure: notUsed,
+      updateBloodPressure: notUsed,
+      deleteBloodPressure: notUsed,
+      listRoutineItems: async () => [],
+      createRoutineItem: notUsed,
+      updateRoutineItem: notUsed,
+      reviseSchedule: notUsed,
+      archiveRoutineItem: notUsed,
+      listOccurrences: async (date) => {
+        this.guard();
+        return { date, items: [...this.occurrences.values()].filter((o) => o.localDate === date) };
+      },
+      putOccurrenceIntake: (id, input) => call({ type: 'occurrence.intake.put', entityId: id, payload: input }),
+      undoOccurrenceIntake: notUsed,
+      createIntake: notUsed,
+      updateIntake: notUsed,
+      deleteIntake: notUsed,
+      subscribe: () => () => undefined,
+    };
+  }
+}
+
+export const weightInput = (weightKg = '82.35', measuredAt = '2026-10-10T10:00:00.000Z') => ({
+  operationId: uuid(),
+  id: uuid(),
+  measuredAt,
+  timezone: 'America/Sao_Paulo',
+  weightKg,
+});
