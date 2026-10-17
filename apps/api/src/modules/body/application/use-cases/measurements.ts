@@ -38,12 +38,18 @@ export class RegisterMeasurements extends MeasurementMutation {
       { id: input.id, userId: actor.userId, measuredAt: new Date(input.measuredAt), timezone: input.timezone, notes: input.notes, values: input.values },
       this.clock.now(),
     );
+    const owner = await this.repo.ownerOf(session.id, tx);
+    if (owner) {
+      // id already used: by this user → conflict with its current state; by another user → conflict, nothing revealed
+      const own = owner === actor.userId ? await this.repo.findById(actor.userId, session.id, tx) : null;
+      throw new VersionConflictError(own && !own.deletedAt ? toMeasurementDto(own) : undefined);
+    }
     try {
       await this.repo.insert(session, tx);
     } catch (err) {
-      if (!(err instanceof DuplicateIdError)) throw err;
-      const own = await this.repo.findById(actor.userId, input.id, tx);
-      throw new VersionConflictError(own && !own.deletedAt ? toMeasurementDto(own) : undefined);
+      // concurrent insert of the same id committed first (the transaction is now aborted: no further reads)
+      if (err instanceof DuplicateIdError) throw new VersionConflictError(undefined);
+      throw err;
     }
     await this.changeLog.record(tx, actor.userId, { entity: 'measurementSession', id: session.id, op: 'upsert' });
     return toMeasurementDto(session);

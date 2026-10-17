@@ -46,12 +46,18 @@ export class RegisterBloodPressure extends Mutation {
       },
       this.clock.now(),
     );
+    const owner = await this.repo.ownerOf(entry.id, tx);
+    if (owner) {
+      // id already used: by this user → conflict with its current state; by another user → conflict, nothing revealed
+      const own = owner === actor.userId ? await this.repo.findById(actor.userId, entry.id, tx) : null;
+      throw new VersionConflictError(own && !own.deletedAt ? toBloodPressureDto(own) : undefined);
+    }
     try {
       await this.repo.insert(entry, tx);
     } catch (err) {
-      if (!(err instanceof DuplicateIdError)) throw err;
-      const own = await this.repo.findById(actor.userId, input.id, tx);
-      throw new VersionConflictError(own && !own.deletedAt ? toBloodPressureDto(own) : undefined);
+      // concurrent insert of the same id committed first (the transaction is now aborted: no further reads)
+      if (err instanceof DuplicateIdError) throw new VersionConflictError(undefined);
+      throw err;
     }
     await this.changeLog.record(tx, actor.userId, { entity: 'bloodPressureEntry', id: entry.id, op: 'upsert' });
     return toBloodPressureDto(entry);

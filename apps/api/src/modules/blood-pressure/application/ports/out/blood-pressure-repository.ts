@@ -4,6 +4,8 @@ import type { BloodPressureEntry } from '../../../domain/entities/blood-pressure
 
 export interface BloodPressureRepository {
   findById(userId: string, id: string, tx?: TxContext): Promise<BloodPressureEntry | null>;
+  /** userId that owns this id (any user) or null */
+  ownerOf(id: string, tx?: TxContext): Promise<string | null>;
   insert(entry: BloodPressureEntry, tx: TxContext): Promise<void>;
   updateIfVersion(entry: BloodPressureEntry, expectedVersion: number, tx: TxContext): Promise<boolean>;
   page(userId: string, params: HistoryParams, tx?: TxContext): Promise<HistoryPage<BloodPressureEntry>>;

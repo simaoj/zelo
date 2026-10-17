@@ -43,6 +43,12 @@ export class MongoHistoryRepository<D extends HistoryDoc, E extends HistoryEntit
     return d ? this.toDomain(d as D) : null;
   }
 
+  /** userId owning `id` (any user), or null. Used to reject id reuse before inserting. */
+  async ownerOf(id: string, tx?: TxContext): Promise<string | null> {
+    const d = await this.col.findOne({ _id: id } as Filter<D>, { session: sessionOf(tx), projection: { userId: 1 } });
+    return d ? (d as D).userId : null;
+  }
+
   async insert(entity: E, tx: TxContext): Promise<void> {
     try {
       await this.col.insertOne(this.toDoc(entity) as OptionalUnlessRequiredId<D>, { session: sessionOf(tx) });

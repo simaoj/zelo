@@ -13,6 +13,8 @@ export interface WeightRepository {
   /** includes tombstones (deletedAt set) */
   findById(userId: string, id: string, tx?: TxContext): Promise<WeightEntry | null>;
   /** throws DuplicateIdError if the id exists */
+  /** userId that owns this id (any user) or null */
+  ownerOf(id: string, tx?: TxContext): Promise<string | null>;
   insert(entry: WeightEntry, tx: TxContext): Promise<void>;
   /** atomic `{_id, userId, version: expectedVersion}` + `$inc version`; false on mismatch */
   updateIfVersion(entry: WeightEntry, expectedVersion: number, tx: TxContext): Promise<boolean>;
@@ -37,6 +39,8 @@ export interface WeightGoalRepository {
 
 export interface MeasurementRepository {
   findById(userId: string, id: string, tx?: TxContext): Promise<MeasurementSession | null>;
+  /** userId that owns this id (any user) or null */
+  ownerOf(id: string, tx?: TxContext): Promise<string | null>;
   insert(session: MeasurementSession, tx: TxContext): Promise<void>;
   updateIfVersion(session: MeasurementSession, expectedVersion: number, tx: TxContext): Promise<boolean>;
   page(userId: string, params: HistoryParams, tx?: TxContext): Promise<HistoryPage<MeasurementSession>>;
