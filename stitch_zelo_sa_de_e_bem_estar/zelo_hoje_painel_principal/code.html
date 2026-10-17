@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-secondary-container": "#006e6e", "on-tertiary": "#ffffff", "primary-fixed": "#ffdbcc", "on-error-container": "#93000a", "on-error": "#ffffff", "surface-dim": "#dbdad6", "on-primary-fixed": "#351000", "primary-fixed-dim": "#ffb695", "surface-container-highest": "#e4e2de", "inverse-on-surface": "#f2f0ed", "error-container": "#ffdad6", "on-surface-variant": "#574239", "surface-bright": "#fbf9f5", "tertiary": "#6c5e00", "surface-variant": "#e4e2de", "on-secondary-fixed-variant": "#004f4f", "surface-container": "#efeeea", "primary-container": "#ff8243", "secondary-fixed": "#88f4f3", "tertiary-container": "#b7a649", "on-primary": "#ffffff", "primary": "#a23f00", "surface-container-low": "#f5f3ef", "surface": "#fbf9f5", "inverse-primary": "#ffb695", "on-tertiary-fixed-variant": "#524700", "on-secondary-fixed": "#002020", "on-background": "#1b1c1a", "on-tertiary-container": "#443b00", "on-surface": "#1b1c1a", "secondary-container": "#85f1f0", "surface-container-high": "#eae8e4", "outline-variant": "#dec0b4", "on-primary-container": "#682600", "secondary-fixed-dim": "#6ad7d7", "on-secondary": "#ffffff", "tertiary-fixed-dim": "#dac766", "secondary": "#006a6a", "error": "#ba1a1a", "outline": "#8b7267", "on-tertiary-fixed": "#211b00", "background": "#fbf9f5", "surface-tint": "#a23f00", "surface-container-lowest": "#ffffff", "tertiary-fixed": "#f7e37f", "inverse-surface": "#30312e", "on-primary-fixed-variant": "#7b2f00" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "1rem", "gutter-mobile": "0.75rem", "space-xl": "2.25rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "margin-mobile": "1.25rem", "space-lg": "1.5rem", "margin": "2rem", "space-md": "1rem" }, fontFamily: { "label-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Newsreader"], "body-lg": ["Plus Jakarta Sans"], "headline-md": ["Newsreader"], "headline-sm": ["Newsreader"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Newsreader"], "headline-xl-mobile": ["Newsreader"], "title-md": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-xl": ["Newsreader"] }, fontSize: { "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-lg-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "500" }], "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "500" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "600" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "headline-xl-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "title-md": ["18px", { "lineHeight": "26px", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "600" }] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased flex flex-col min-h-screen selection:bg-primary-container selection:text-on-primary"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe shadow-[0_1px_12px_rgba(89,44,18,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><img alt="logo zelo app.png" class="h-8 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VD2GWI8dgT5n-mufaqEapTtPkbcVHQjjMwT_bOnft4xvnbxItIjTB2W6JI0-iCnI5eA8asmRTsRvX5HbrtAt1riGWwGcX53uS6iiAmEmqCUHYLZfyaFi3Php6qAkCKXoR_rhD7I1-pku43ou0_peXZw_sqZ8WGDlfX_Sna3hI3EJyWrpaPWagNyGubiiZDhJNeg8BL2DMcqI_ajI5jk1b9EEUdbd0jrbXn2GnvM87VMw4Cp5i5aMLUwipLfd9IGcay3UwBK8sa1Q"/><div class="flex flex-col truncate"><span class="font-label-sm text-label-sm text-on-surface-variant leading-none truncate">Zelo</span><span class="font-title-md text-title-md text-on-surface font-semibold leading-tight truncate">Hoje</span></div></div><div class="flex items-center gap-space-xs"><button aria-label="Notificações e Avisos" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary active:bg-surface-container transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xs shadow-[0_2px_8px_rgba(162,63,0,0.25)]"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-[calc(100vh-4rem)]"><div class="flex flex-col w-full px-margin-mobile pb-space-lg gap-space-lg">
+<!-- Acolhimento & Saudação Quente com Elemento Geométrico Semicircular Zelo -->
+<section class="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-space-md shadow-[0_4px_24px_-4px_rgba(89,44,18,0.06)]">
+<!-- Decoração solar inspirada no logo Zelo -->
+<div class="absolute -top-10 -right-8 w-32 h-32 rounded-full bg-tertiary-fixed opacity-40 pointer-events-none blur-xl"></div>
+<div class="absolute top-12 -right-4 w-20 h-20 rounded-full bg-primary-fixed opacity-50 pointer-events-none blur-lg"></div>
+<div class="relative z-10 flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-bold">Seu cuidado, dia a dia</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-fixed/40 text-on-secondary-fixed-variant font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+          Em dia
+        </span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-semibold tracking-tight">
+        Bom dia, Mariana
+      </h1>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-tertiary">calendar_today</span>
+        Quinta-feira, 24 de Outubro
+      </p>
+<!-- Mensagem afetuosa não-clínica -->
+<div class="mt-2 pt-2 border-t border-surface-container-high/60 flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">spa</span>
+<span class="font-body-md text-body-md italic text-on-surface">“Um dia de cada vez, cuidando do seu bem-estar com carinho.”</span>
+</div>
+</div>
+</section>
+<!-- Seção Atalhos Rápidos (Horizontal Scroll Amigável) -->
+<section class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<h2 class="font-label-md text-label-md text-on-surface font-semibold uppercase tracking-wider">Ações Rápidas</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Adicionar registro</span>
+</div>
+<div class="flex items-center gap-space-sm overflow-x-auto pb-1 pt-0.5 scrollbar-none -mx-margin-mobile px-margin-mobile">
+<!-- + Pressão -->
+<button class="flex items-center gap-2 py-2.5 px-4 rounded-xl bg-primary-container text-on-primary font-label-md text-label-md shadow-[0_4px_14px_rgba(255,130,67,0.25)] active:scale-95 transition-transform flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+<span>+ Pressão</span>
+</button>
+<!-- + Peso -->
+<button class="flex items-center gap-2 py-2.5 px-4 rounded-xl bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-[0_2px_8px_rgba(89,44,18,0.05)] active:scale-95 transition-transform flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">monitor_weight</span>
+<span>+ Peso</span>
+</button>
+<!-- + Medidas -->
+<button class="flex items-center gap-2 py-2.5 px-4 rounded-xl bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-[0_2px_8px_rgba(89,44,18,0.05)] active:scale-95 transition-transform flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary">straighten</span>
+<span>+ Medidas</span>
+</button>
+<!-- + Rotina -->
+<button class="flex items-center gap-2 py-2.5 px-4 rounded-xl bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-[0_2px_8px_rgba(89,44,18,0.05)] active:scale-95 transition-transform flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">medication</span>
+<span>+ Rotina</span>
+</button>
+</div>
+</section>
+<!-- Seção em Destaque: Seu Cuidado Hoje -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-6 rounded-full bg-primary-container"></div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Seu cuidado hoje</h2>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">1 de 3 concluídos</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Card Interativo 1: Vitamina D (Com toggle interativo) -->
+<div class="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-4 shadow-[0_4px_16px_rgba(89,44,18,0.04)] transition-all duration-300" id="dose-card-vitamina">
+<!-- Detalhe decorativo de meia-lua no canto -->
+<div class="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-tertiary-fixed/30 pointer-events-none"></div>
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-start gap-3 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-tertiary-fixed/40 flex items-center justify-center flex-shrink-0 transition-colors" id="vitamina-icon-bg">
+<span class="material-symbols-outlined text-tertiary text-[24px]" id="vitamina-icon">pill</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-tertiary uppercase tracking-wider">08:00</span>
+<span class="text-on-surface-variant text-[10px]">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Manhã</span>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold truncate">Vitamina D 2.000 UI</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">1 cápsula gelatinosa com café da manhã</p>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-3 flex items-center justify-between gap-2 border-t border-surface-container-high/50">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1" id="vitamina-status-text">
+<span class="material-symbols-outlined text-[16px] text-tertiary">schedule</span>
+            Aguardando ingestão
+          </span>
+<button class="min-h-[44px] px-4 py-2 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-2 hover:bg-secondary hover:text-on-secondary active:scale-95 transition-all" id="btn-tomar-vitamina" onclick="toggleVitaminaTomada()" type="button">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span>Marcar como tomado</span>
+</button>
+</div>
+</div>
+<!-- Card Interativo 2: Aferir Pressão Arterial (Ação Primária Cor #FF8243) -->
+<div class="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-4 shadow-[0_4px_16px_rgba(89,44,18,0.05)]">
+<!-- Acento superior de arco sutil -->
+<div class="absolute top-0 left-6 right-6 h-1 rounded-b-full bg-primary-container"></div>
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-start gap-3 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-primary-fixed/50 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-[24px]">cardiology</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm font-semibold text-primary uppercase tracking-wider">10:00</span>
+<span class="text-on-surface-variant text-[10px]">•</span>
+<span class="inline-flex items-center px-1.5 py-0.2 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-[10px] font-bold">Pendente</span>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold truncate">Aferir Pressão Arterial</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Em repouso por 5 min, braço esquerdo</p>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-3 flex items-center justify-between gap-2 border-t border-surface-container-high/50">
+<span class="font-label-sm text-label-sm text-primary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">priority_high</span>
+            Recomendado para agora
+          </span>
+<button class="min-h-[44px] px-4 py-2 rounded-xl bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-2 shadow-[0_4px_12px_rgba(255,130,67,0.3)] hover:opacity-95 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Registrar pressão</span>
+</button>
+</div>
+</div>
+<!-- Card Programado: Ômega 3 -->
+<div class="rounded-2xl bg-surface-container-lowest/80 p-4 shadow-[0_2px_10px_rgba(89,44,18,0.03)] opacity-90">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[22px]">medication_liquid</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm font-medium text-on-surface-variant">14:00</span>
+<span class="text-on-surface-variant text-[10px]">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Após almoço</span>
+</div>
+<h3 class="font-title-md text-title-md text-on-surface font-medium truncate">Ômega 3 1000mg</h3>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm font-semibold">
+            Programado
+          </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Resumo dos Últimos Registros -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-6 rounded-full bg-secondary"></div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Últimos registros</h2>
+</div>
+<a class="font-label-md text-label-md text-primary font-medium hover:underline" href="#">Ver histórico</a>
+</div>
+<!-- Grid de métricas clínicas humanizadas -->
+<div class="flex flex-col gap-space-sm">
+<!-- Card Pressão Arterial com Badge Suave -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-[0_4px_16px_rgba(89,44,18,0.04)] flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-secondary-fixed/50 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-[20px]">ecg_heart</span>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold">Pressão Arterial</h3>
+<p class="font-label-sm text-label-sm text-secondary font-semibold">Hoje às 08:15</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-full bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label-sm text-label-sm font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            Ótima
+          </span>
+</div>
+<div class="flex items-baseline justify-between pt-1">
+<div class="flex items-baseline gap-1.5">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">118 / 76</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">mmHg</span>
+</div>
+<!-- Pulso Badge em Amarelo Claro Refinado -->
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-tertiary-fixed/40 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[16px] text-tertiary" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-title-md text-[14px] font-bold text-on-tertiary-container">72 bpm</span>
+</div>
+</div>
+</div>
+<!-- Card Peso com Sparkline SVG em Teal/Verde-Petróleo -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-[0_4px_16px_rgba(89,44,18,0.04)] flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">monitor_weight</span>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold">Peso Corporal</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-medium">Registrado ontem às 07:30</p>
+</div>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+            Balança de bioimpedância
+          </span>
+</div>
+<div class="flex items-end justify-between pt-1">
+<div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">68,4</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">kg</span>
+</div>
+<p class="font-label-sm text-label-sm text-secondary font-medium mt-0.5">
+              -0,3 kg <span class="text-on-surface-variant font-normal">em relação a 18 out</span>
+</p>
+</div>
+<!-- Mini Sparkline inline em SVG (#006a6a / verde petróleo da paleta) -->
+<div class="w-28 h-10 flex flex-col items-end justify-end">
+<svg class="w-full h-8 overflow-visible" fill="none" preserveaspectratio="none" viewbox="0 0 100 30">
+<!-- Sombra de gradiente suave sob a linha -->
+<defs>
+<lineargradient id="weightGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#006a6a" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#006a6a" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M 0 24 L 20 22 L 40 18 L 60 19 L 80 12 L 100 8 L 100 30 L 0 30 Z" fill="url(#weightGrad)"></path>
+<path d="M 0 24 L 20 22 L 40 18 L 60 19 L 80 12 L 100 8" stroke="#006a6a" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+<circle cx="100" cy="8" fill="#006a6a" r="3.5" stroke="#ffffff" stroke-width="1.5"></circle>
+</svg>
+<span class="font-label-sm text-[10px] text-on-surface-variant tracking-tight mt-1">Últimos 14 dias</span>
+</div>
+</div>
+</div>
+<!-- Card Medidas Corporais -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-[0_4px_16px_rgba(89,44,18,0.04)] flex flex-col gap-2.5">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">straighten</span>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold">Circunferências</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Atualizado há 5 dias (19 out)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant text-[20px]">chevron_right</span>
+</div>
+<div class="grid grid-cols-2 gap-2 pt-1">
+<div class="p-2.5 rounded-xl bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Cintura</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-title-md text-title-md text-on-surface font-bold">78</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">cm</span>
+</div>
+</div>
+<div class="p-2.5 rounded-xl bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Quadril</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-title-md text-title-md text-on-surface font-bold">99</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">cm</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Lembrete Delicado / Reassurance Banner com paleta Zelo -->
+<section class="relative overflow-hidden rounded-2xl bg-tertiary-fixed/30 p-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">wb_sunny</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-tertiary-container font-semibold">Sol da manhã &amp; Hidratação</span>
+<p class="font-body-md text-body-md text-on-surface-variant leading-snug">Você já bebeu 800ml hoje. Mantenha uma garrafa de água fresca por perto!</p>
+</div>
+</section>
+</div>
+<script>
+  function toggleVitaminaTomada() {
+    const card = document.getElementById('dose-card-vitamina');
+    const iconBg = document.getElementById('vitamina-icon-bg');
+    const icon = document.getElementById('vitamina-icon');
+    const statusText = document.getElementById('vitamina-status-text');
+    const btn = document.getElementById('btn-tomar-vitamina');
+
+    const isTomado = btn.getAttribute('data-tomado') === 'true';
+
+    if (!isTomado) {
+      // Estado com feedback visual alegre
+      btn.setAttribute('data-tomado', 'true');
+      btn.className = "min-h-[44px] px-4 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-label-md flex items-center gap-2 active:scale-95 transition-all shadow-[0_4px_12px_rgba(0,106,106,0.3)]";
+      btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">done_all</span><span>Tomado com sucesso!</span>';
+      
+      iconBg.className = "w-11 h-11 rounded-xl bg-secondary-fixed flex items-center justify-center flex-shrink-0 transition-colors";
+      icon.className = "material-symbols-outlined text-secondary text-[24px]";
+      icon.innerText = "check";
+
+      statusText.innerHTML = '<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span> <span class="text-secondary font-semibold">Tomado às 08:22 hoje</span>';
+      
+      card.classList.add('bg-surface-container-lowest/70');
+    } else {
+      // Reverter estado
+      btn.setAttribute('data-tomado', 'false');
+      btn.className = "min-h-[44px] px-4 py-2 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-2 hover:bg-secondary hover:text-on-secondary active:scale-95 transition-all";
+      btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">check_circle</span><span>Marcar como tomado</span>';
+
+      iconBg.className = "w-11 h-11 rounded-xl bg-tertiary-fixed/40 flex items-center justify-center flex-shrink-0 transition-colors";
+      icon.className = "material-symbols-outlined text-tertiary text-[24px]";
+      icon.innerText = "pill";
+
+      statusText.innerHTML = '<span class="material-symbols-outlined text-[16px] text-tertiary">schedule</span> Aguardando ingestão';
+      card.classList.remove('bg-surface-container-lowest/70');
+    }
+  }
+</script></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(89,44,18,0.06)]" data-active-classes="text-primary font-bold"><div class="flex items-center justify-between h-20 px-space-xs max-w-lg mx-auto"><a aria-current="page" class="flex flex-col items-center justify-center flex-1 h-full transition-colors group text-primary font-bold" data-path="hoje" href="#"><span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">sunny</span><span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Hoje</span></a><a class="flex flex-col items-center justify-center flex-1 h-full text-on-surface-variant transition-colors group" data-path="corpo" href="#"><span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">straighten</span><span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Corpo</span></a><div class="relative flex flex-col items-center justify-center px-1 -mt-5"><a aria-label="Registrar dados de saúde" class="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-primary-container text-on-primary shadow-[0_8px_20px_rgba(255,130,67,0.38)] active:scale-95 transition-all duration-200" data-path="registro-rapido" href="#"><span class="material-symbols-outlined text-[28px]">add</span></a><span class="font-label-sm text-label-sm text-on-surface-variant font-semibold mt-1 tracking-tight">Registrar</span></div><a class="flex flex-col items-center justify-center flex-1 h-full text-on-surface-variant transition-colors group" data-path="pressao" href="#"><span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">ecg_heart</span><span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Pressão</span></a><a class="flex flex-col items-center justify-center flex-1 h-full text-on-surface-variant transition-colors group" data-path="rotina" href="#"><span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">pill</span><span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Rotina</span></a></div></nav></body></html>

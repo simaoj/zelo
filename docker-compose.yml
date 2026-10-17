@@ -1,0 +1,73 @@
+# Zelo — local environment. `docker compose up --build` → http://localhost:3000
+name: zelo
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports: ["27017:27017"]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      # initiates the single-node replica set on first boot (idempotent), then reports health
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }"
+      interval: 5s
+      timeout: 10s
+      start_period: 10s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025"] # web UI for password-reset e-mails
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["node", "apps/api/dist/bootstrap/migrate.js"]
+    env_file: [.env]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/zelo?replicaSet=rs0
+    depends_on:
+      mongo: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    env_file: [.env]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/zelo?replicaSet=rs0
+      SMTP_URL: smtp://mailpit:1025
+      PORT: 4000
+    ports: ["4000:4000"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      retries: 20
+
+  worker:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["node", "apps/api/dist/bootstrap/worker.js"]
+    env_file: [.env]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/zelo?replicaSet=rs0
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      # server-side rewrite target for /api/* (same public origin, no CORS)
+      API_INTERNAL_URL: http://api:4000
+    ports: ["3000:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  mongo-data:
