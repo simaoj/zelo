@@ -92,4 +92,7 @@ export class DeviceFlags {
   set pushSubscriptionId(v: string | null) {
     this.set(K.pushSubscriptionId, v);
   }
+  setPushSubscriptionId(v: string | null) {
+    this.set(K.pushSubscriptionId, v);
+  }
 }
