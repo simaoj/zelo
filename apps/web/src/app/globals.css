@@ -1,0 +1,63 @@
+@import 'tailwindcss';
+
+/*
+ * Zelo design tokens (spec §3 + stitch "Tropical Care").
+ * Use these utility names everywhere: bg-brand-orange, text-ink, bg-surface, border-line, etc.
+ * Text on orange/pink/yellow must be dark (text-ink) for contrast — never white on #FF8243.
+ */
+@theme {
+  --color-brand-orange: #ff8243;
+  --color-brand-orange-strong: #f27231;
+  --color-brand-orange-ink: #7b2f00; /* orange-family text that passes AA on light bg */
+  --color-brand-pink: #ffc0cb;
+  --color-brand-yellow: #fce883;
+  --color-brand-teal: #069494;
+  --color-brand-teal-ink: #006a6a; /* teal text that passes AA on light bg */
+  --color-brand-teal-wash: #e7f5f5;
+  --color-background: #fffcf8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f3ef;
+  --color-wash-sun: #fff9df;
+  --color-wash-peach: #fff5ec;
+  --color-ink: #202020;
+  --color-ink-muted: #574239;
+  --color-line: #ebe6df;
+  --color-danger: #ba1a1a;
+  --color-danger-wash: #ffdad6;
+
+  --font-sans: var(--font-jakarta), 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  --font-display: var(--font-newsreader), Newsreader, Georgia, serif;
+
+  --radius-card: 20px;
+  --radius-field: 12px;
+
+  --shadow-card: 0 4px 20px -2px rgba(89, 44, 18, 0.05);
+  --shadow-float: 0 12px 36px -4px rgba(89, 44, 18, 0.09);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-brand-teal);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
