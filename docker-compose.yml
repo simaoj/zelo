@@ -3,7 +3,7 @@ name: zelo
 
 services:
   mongo:
-    image: mongo:8.0
+    image: mongo:8.2 # 8.0 refuses to start on Linux kernels >= 6.19 (SERVER-121912)
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     ports: ["27017:27017"]
     volumes: [mongo-data:/data/db]
