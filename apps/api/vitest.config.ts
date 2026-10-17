@@ -9,6 +9,7 @@ export default defineConfig({
           include: ['src/**/*.test.ts'],
           exclude: ['src/**/*.int.test.ts', 'node_modules/**', 'dist/**'],
           environment: 'node',
+          sequence: { groupOrder: 0 },
         },
       },
       {
@@ -21,6 +22,7 @@ export default defineConfig({
           hookTimeout: 120_000,
           // each file starts its own in-memory replica set; keep parallelism modest
           maxWorkers: 4,
+          sequence: { groupOrder: 1 },
         },
       },
     ],
