@@ -28,32 +28,25 @@ export function usePagedHistory<T>(
   const seq = useRef(0);
   const pagesLoaded = useRef(1);
 
-  const load = useCallback(
-    async (reset: boolean) => {
-      const my = ++seq.current;
-      setState((s) => ({ ...s, loading: true, error: null }));
-      try {
-        if (reset) {
-          // reload as many pages as were visible so the list doesn't jump
-          let items: T[] = [];
-          let cursor: string | null = null;
-          for (let i = 0; i < pagesLoaded.current; i++) {
-            const page = await listerRef.current(ds, { limit: pageSize, ...(cursor ? { cursor } : {}) });
-            items = items.concat(page.items);
-            cursor = page.nextCursor;
-            if (!cursor) break;
-          }
-          if (my === seq.current) setState({ items, cursor, loading: false, error: null, loaded: true });
-        } else {
-          setState((s) => s);
-        }
-      } catch (error) {
-        if (error instanceof DataError && error.status === 401) expire?.();
-        if (my === seq.current) setState((s) => ({ ...s, loading: false, error }));
+  /** (Re)loads from the first page, keeping as many pages as were visible so the list doesn't jump. */
+  const load = useCallback(async () => {
+    const my = ++seq.current;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      let items: T[] = [];
+      let cursor: string | null = null;
+      for (let i = 0; i < pagesLoaded.current; i++) {
+        const page = await listerRef.current(ds, { limit: pageSize, ...(cursor ? { cursor } : {}) });
+        items = items.concat(page.items);
+        cursor = page.nextCursor;
+        if (!cursor) break;
       }
-    },
-    [ds, pageSize, expire],
-  );
+      if (my === seq.current) setState({ items, cursor, loading: false, error: null, loaded: true });
+    } catch (error) {
+      if (error instanceof DataError && error.status === 401) expire?.();
+      if (my === seq.current) setState((s) => ({ ...s, loading: false, error }));
+    }
+  }, [ds, pageSize, expire]);
 
   const loadMore = useCallback(async () => {
     const cursor = state.cursor;
@@ -71,8 +64,8 @@ export function usePagedHistory<T>(
 
   useEffect(() => {
     pagesLoaded.current = 1;
-    void load(true);
-    return ds.subscribe(() => void load(true));
+    void load();
+    return ds.subscribe(() => void load());
   }, [ds, key, load]);
 
   return {
@@ -82,6 +75,6 @@ export function usePagedHistory<T>(
     loaded: state.loaded,
     error: state.error,
     loadMore,
-    reload: () => void load(true),
+    reload: () => void load(),
   };
 }
