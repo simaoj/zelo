@@ -274,6 +274,7 @@ export class FakeServer {
       putOccurrenceIntake: (id, input) => call({ type: 'occurrence.intake.put', entityId: id, payload: input }),
       undoOccurrenceIntake: notUsed,
       createIntake: notUsed,
+      listIntakes: notUsed,
       updateIntake: notUsed,
       deleteIntake: notUsed,
       subscribe: () => () => undefined,

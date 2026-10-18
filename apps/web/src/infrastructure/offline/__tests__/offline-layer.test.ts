@@ -52,6 +52,23 @@ describe('offline disabled', () => {
 });
 
 describe('queue + local write', () => {
+  it('pages intake history offline by the original history instant, including decisions outside the occurrence cache', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    const db = rawDb(U1);
+    const base = { itemId: uuid(), occurrenceId: null, status: 'taken' as const, notes: null, nameSnapshot: 'Exemplo', doseSnapshot: '1', unitSnapshot: 'cápsula', version: 0, createdAt: '2026-10-17T12:00:00.000Z', updatedAt: '2026-10-17T12:00:00.000Z' };
+    await db.intakeRecords.bulkPut([
+      { ...base, id: 'a', actualTakenAt: '2026-10-10T12:00:00.000Z' },
+      { ...base, id: 'b', occurrenceId: uuid(), status: 'not_taken', actualTakenAt: null, sortAt: '2026-10-09T12:00:00.000Z' },
+    ]);
+    db.close();
+    const first = await layer.data.listIntakes({ limit: 1 });
+    expect(first.items.map((i) => i.id)).toEqual(['a']);
+    const second = await layer.data.listIntakes({ limit: 1, cursor: first.nextCursor! });
+    expect(second.items.map((i) => i.id)).toEqual(['b']);
+    expect(second.nextCursor).toBeNull();
+  });
+
   it('offline create writes entity and queued op in one transaction and returns persistence local', async () => {
     const { server, layer } = await enabledLayer();
     server.online = false;

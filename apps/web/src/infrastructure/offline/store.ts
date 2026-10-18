@@ -288,6 +288,7 @@ export async function applyLocalEdit(db: ZeloDb, type: SyncOperationType, entity
       itemId: occ.itemId,
       occurrenceId: occ.id,
       status: payload.status as IntakeRecord['status'],
+      sortAt: payload.status === 'taken' ? payload.actualTakenAt as string : occ.scheduledAt,
       actualTakenAt: (payload.actualTakenAt as string | null) ?? null,
       notes: payload.notes !== undefined ? (payload.notes as string | null) : (prev?.notes ?? null),
       nameSnapshot: occ.nameSnapshot,

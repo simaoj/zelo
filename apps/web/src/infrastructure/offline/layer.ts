@@ -977,6 +977,12 @@ export function createOfflineDataSource(rt: OfflineRuntime): ZeloDataSource {
       rt.mutate<IntakeRecord>('occurrence.intake.put', occurrenceId, input, () => http.putOccurrenceIntake(occurrenceId, input)),
     undoOccurrenceIntake: (occurrenceId, input) => rt.mutate('occurrence.intake.delete', occurrenceId, input, () => http.undoOccurrenceIntake(occurrenceId, input)),
     createIntake: (input: CreateIntakeRequest) => rt.mutate<IntakeRecord>('intake.create', input.id, input, () => http.createIntake(input)),
+    listIntakes: (q) => local(async (db) => {
+      const occurrences = new Map((await db.occurrences.toArray()).map((o) => [o.id, o.scheduledAt]));
+      return pageLocal((await db.intakeRecords.toArray()).map((i) => ({
+        ...i, measuredAt: i.sortAt ?? i.actualTakenAt ?? occurrences.get(i.occurrenceId ?? '') ?? i.createdAt,
+      })), q);
+    }, () => http.listIntakes(q)),
     updateIntake: (id, input) =>
       onlineOnly(
         () => http.updateIntake(id, input),
