@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { CalendarDays, ChevronRight, HeartPulse, Pill, Plus, Ruler, Scale, Sprout } from 'lucide-react';
+import { CalendarDays, ChevronRight, Droplets, Footprints, HeartPulse, History, Pill, Plus, Ruler, Scale, Sprout, Timer } from 'lucide-react';
 import type { DashboardResponse, Module } from '@zelo/contracts';
 import { InstallPrompt } from '@/pwa';
 import { useResource } from '@/shared/data/hooks';
@@ -16,9 +16,15 @@ import { useRegister, type RegisterKind } from '@/features/shell/RegisterDialog'
 import { OccurrenceCard } from '@/features/routine/OccurrenceCard';
 import { effectiveState, isDecided } from '@/features/routine/occurrenceLogic';
 import { measurementLabel } from '@/features/body/measurementLogic';
+import { useWaterQuickAdd } from '@/features/hydration/useWaterQuickAdd';
+import { ActivityEmpty, ReceivedLine } from '@/features/activity/ActivityBits';
+import { formatDuration, formatInt, formatMl, percentOf } from '@/shared/lib/format';
+import { localTimeOf } from '@/shared/lib/time';
+import { ProgressBar } from '@/shared/ui/ProgressRing';
 
 const QUICK: { kind: RegisterKind; label: string; module: Module; icon: typeof Scale; primary?: boolean }[] = [
   { kind: 'bloodPressure', label: 'Pressão', module: 'bloodPressure', icon: HeartPulse, primary: true },
+  { kind: 'water', label: 'Água', module: 'hydration', icon: Droplets },
   { kind: 'weight', label: 'Peso', module: 'body', icon: Scale },
   { kind: 'measurement', label: 'Medidas', module: 'body', icon: Ruler },
   { kind: 'intake', label: 'Tomada', module: 'routine', icon: Pill },
@@ -130,6 +136,22 @@ export function TodayPage() {
             </div>
           ) : null}
         </section>
+
+        {(has('hydration') || has('activity')) && (
+          <section aria-labelledby="ritmo-title" className="flex flex-col gap-3">
+            <SectionTitle id="ritmo-title" accent="teal">
+              {has('hydration') ? 'Ritmo diário & Água' : 'Ritmo diário'}
+            </SectionTitle>
+            {dash.loading && !d ? (
+              <SkeletonCard lines={3} />
+            ) : d ? (
+              <>
+                {has('hydration') && <WaterToday d={d} tz={tz} onOther={() => open('water')} />}
+                {has('activity') && <ActivityTodayBlock d={d} tz={tz} />}
+              </>
+            ) : null}
+          </section>
+        )}
       </div>
 
       {/* Últimos registros */}
@@ -178,7 +200,7 @@ function LatestBp({ d, tz }: { d: DashboardResponse; tz: string }) {
           </h3>
           {bp && <p className="text-xs font-semibold text-brand-teal-ink">{describeInstant(bp.measuredAt, tz)}</p>}
         </div>
-        <Link href="/pressao" className="inline-flex size-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface-muted">
+        <Link href="/saude/pressao" className="inline-flex size-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface-muted">
           <ChevronRight aria-hidden className="size-5" />
           <span className="sr-only">Ver pressão arterial</span>
         </Link>
@@ -278,5 +300,110 @@ function LatestMeasurement({ d, tz }: { d: DashboardResponse; tz: string }) {
         <p className="mt-2 text-sm text-ink-muted">Sem medidas registradas ainda.</p>
       )}
     </Card>
+  );
+}
+
+function WaterToday({ d, tz, onOther }: { d: DashboardResponse; tz: string; onOther: () => void }) {
+  const h = d.hydration;
+  const quick = useWaterQuickAdd(tz);
+  const goal = h.goal?.dailyTargetMl ?? null;
+  return (
+    <Card aria-labelledby="agua-hoje">
+      <div className="flex items-start gap-3">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-teal-wash text-brand-teal-ink">
+          <Droplets aria-hidden className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 id="agua-hoje" className="text-[17px] font-semibold">
+            <Link href="/saude/agua" className="hover:underline">
+              Água de hoje
+            </Link>
+          </h3>
+          <p className="tabular text-xs text-ink-muted">{goal ? `Meta pessoal: ${formatMl(goal)}` : 'Sem meta pessoal definida'}</p>
+        </div>
+        {goal && h.totalMl != null && (
+          <span className="tabular rounded-full bg-brand-teal-wash px-2.5 py-0.5 text-xs font-bold text-brand-teal-ink">{percentOf(h.totalMl, goal)}%</span>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-2">
+        {h.totalMl != null ? (
+          <p className="tabular">
+            <span className="font-display text-[32px] font-semibold leading-none text-brand-teal-ink">{formatInt(h.totalMl)}</span>{' '}
+            <span className="text-sm text-ink-muted">{goal ? `/ ${formatMl(goal)}` : 'ml'}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-ink-muted">Nenhuma água registrada hoje ainda.</p>
+        )}
+        {h.lastEntryAt && (
+          <p className="flex items-center gap-1 text-xs text-ink-muted">
+            <History aria-hidden className="size-3.5" />
+            Último registro às {localTimeOf(h.lastEntryAt, tz)}
+          </p>
+        )}
+      </div>
+      {goal && h.totalMl != null && (
+        <div className="mt-3">
+          <ProgressBar fraction={h.totalMl / goal} />
+        </div>
+      )}
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        {[200, 300].map((ml) => (
+          <Button
+            key={ml}
+            variant="soft"
+            size="sm"
+            pending={quick.pendingAmount === ml}
+            disabled={quick.pendingAmount != null}
+            onClick={() => void quick.add(ml)}
+            aria-label={`Registrar ${formatMl(ml)} agora`}
+          >
+            <span className="tabular">+{ml} ml</span>
+          </Button>
+        ))}
+        <Button variant="teal" size="sm" onClick={onOther} icon={<Plus aria-hidden className="size-4" />}>
+          Outro
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function ActivityTodayBlock({ d, tz }: { d: DashboardResponse; tz: string }) {
+  const a = d.activity;
+  if (!a.lastReceivedAt) return <ActivityEmpty />;
+  const steps = a.steps.count;
+  const goal = a.stepsGoal?.dailyStepsTarget ?? null;
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+        <Link href="/atividade/passos" className="flex flex-col gap-2 rounded-card bg-surface p-4 shadow-card hover:bg-wash-peach">
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex size-9 items-center justify-center rounded-full bg-wash-peach text-brand-orange-ink">
+              <Footprints aria-hidden className="size-5" />
+            </span>
+            {goal && steps != null && <span className="tabular text-xs font-semibold text-ink-muted">{percentOf(steps, goal)}%</span>}
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Passos</span>
+          <span className="tabular font-display text-[26px] font-semibold leading-none">{steps != null ? formatInt(steps) : <span className="text-base font-sans text-ink-muted">Sem dados</span>}</span>
+          {goal && <span className="tabular text-xs text-ink-muted">Meta pessoal: {formatInt(goal)}</span>}
+          {goal && steps != null && <ProgressBar fraction={steps / goal} color="bg-brand-orange" />}
+        </Link>
+        <Link href="/atividade/exercicios" className="flex flex-col gap-2 rounded-card bg-surface p-4 shadow-card hover:bg-wash-peach">
+          <span className="flex size-9 items-center justify-center rounded-full bg-wash-sun text-[#6c5e00]">
+            <Timer aria-hidden className="size-5" />
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Movimento</span>
+          {a.workoutCount > 0 ? (
+            <>
+              <span className="tabular font-display text-[26px] font-semibold leading-none">{formatDuration(a.workoutSeconds)}</span>
+              <span className="text-xs text-ink-muted">{a.workoutCount === 1 ? '1 exercício hoje' : `${a.workoutCount} exercícios hoje`}</span>
+            </>
+          ) : (
+            <span className="text-sm text-ink-muted">Nenhum exercício hoje</span>
+          )}
+        </Link>
+      </div>
+      <ReceivedLine lastReceivedAt={a.lastReceivedAt} tz={tz} partial={a.steps.partial && steps != null} />
+    </>
   );
 }

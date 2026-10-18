@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, HeartPulse, Pill, Ruler, Scale } from 'lucide-react';
+import { ChevronLeft, Droplets, HeartPulse, Pill, Ruler, Scale } from 'lucide-react';
 import type { Module } from '@zelo/contracts';
 import { useOptionalSession } from '@/shared/data/session';
 import { Dialog } from '@/shared/ui/Dialog';
@@ -9,8 +9,9 @@ import { WeightForm } from '@/features/body/WeightForm';
 import { MeasurementForm } from '@/features/body/MeasurementForm';
 import { BloodPressureForm } from '@/features/blood-pressure/BloodPressureForm';
 import { RegisterIntakePanel } from '@/features/routine/RegisterIntakePanel';
+import { WaterForm } from '@/features/hydration/WaterForm';
 
-export type RegisterKind = 'weight' | 'measurement' | 'bloodPressure' | 'intake';
+export type RegisterKind = 'weight' | 'measurement' | 'bloodPressure' | 'water' | 'intake';
 
 interface RegisterContextValue {
   open: (kind?: RegisterKind) => void;
@@ -23,6 +24,7 @@ export const REGISTER_OPTIONS: { kind: RegisterKind; label: string; description:
   { kind: 'weight', label: 'Peso', description: 'kg, data e horário', module: 'body', icon: Scale },
   { kind: 'measurement', label: 'Medidas', description: 'cintura, quadril, braço…', module: 'body', icon: Ruler },
   { kind: 'bloodPressure', label: 'Pressão', description: 'sistólica, diastólica e pulso', module: 'bloodPressure', icon: HeartPulse },
+  { kind: 'water', label: 'Água', description: 'quantidade em ml e horário', module: 'hydration', icon: Droplets },
   { kind: 'intake', label: 'Tomada', description: 'medicamento, vitamina ou suplemento', module: 'routine', icon: Pill },
 ];
 
@@ -30,6 +32,7 @@ const TITLES: Record<RegisterKind, string> = {
   weight: 'Registrar peso',
   measurement: 'Registrar medidas',
   bloodPressure: 'Registrar pressão',
+  water: 'Registrar água',
   intake: 'Registrar tomada',
 };
 
@@ -60,7 +63,7 @@ export function RegisterDialog({
 }) {
   const session = useOptionalSession();
   const toast = useToast();
-  const visible = modules ?? session?.profile.visibleModules ?? ['body', 'bloodPressure', 'routine'];
+  const visible = modules ?? session?.profile.visibleModules ?? ['body', 'bloodPressure', 'hydration', 'activity', 'routine'];
   const options = REGISTER_OPTIONS.filter((o) => visible.includes(o.module));
 
   const done = (persistence: 'server' | 'local', what: string) => {
@@ -105,6 +108,7 @@ export function RegisterDialog({
       {kind === 'weight' && <WeightForm onDone={(m) => done(m.persistence, 'Peso')} />}
       {kind === 'measurement' && <MeasurementForm onDone={(m) => done(m.persistence, 'Medidas')} />}
       {kind === 'bloodPressure' && <BloodPressureForm onDone={(m) => done(m.persistence, 'Pressão')} />}
+      {kind === 'water' && <WaterForm onDone={(m) => done(m.persistence, 'Registro de água')} />}
       {kind === 'intake' && <RegisterIntakePanel onDone={onClose} />}
     </Dialog>
   );

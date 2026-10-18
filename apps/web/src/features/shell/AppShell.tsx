@@ -2,13 +2,13 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, UserRound } from 'lucide-react';
+import { Plus, Sun, UserRound } from 'lucide-react';
 import { SyncStatusBadge } from '@/pwa';
 import { useSession } from '@/shared/data/session';
 import { useSyncStatus } from '@/shared/data/hooks';
 import { Logo } from '@/shared/ui/Logo';
 import { cx } from '@/shared/ui/cx';
-import { SETTINGS_ITEM, hiddenSectionFor, sectionTitle, visibleNav, type NavItem } from './nav';
+import { SETTINGS_ITEM, hiddenSectionFor, mobileNav, sectionTitle, visibleNav, type NavItem } from './nav';
 import { useRegister } from './RegisterDialog';
 
 function isActive(pathname: string, href: string) {
@@ -21,7 +21,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nav = visibleNav(profile.visibleModules);
   const { open } = useRegister();
   const title = sectionTitle(pathname);
-  const half = Math.ceil(nav.length / 2);
+  const bottom = mobileNav(profile.visibleModules);
+  const half = Math.ceil(bottom.length / 2);
+  const onToday = isActive(pathname, '/hoje');
   const hidden = hiddenSectionFor(pathname, profile.visibleModules);
 
   return (
@@ -71,6 +73,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex shrink-0 items-center gap-1">
             <SyncStatusBadge />
             <Link
+              href="/hoje"
+              aria-current={onToday ? 'page' : undefined}
+              className={cx(
+                'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold',
+                onToday ? 'bg-wash-peach text-brand-orange-ink' : 'text-ink hover:bg-surface-muted',
+              )}
+            >
+              <Sun aria-hidden className="size-5 text-brand-orange-ink" />
+              <span className="max-[359px]:sr-only">Hoje</span>
+            </Link>
+            <Link
               href="/configuracoes"
               aria-current={isActive(pathname, '/configuracoes') ? 'page' : undefined}
               className="inline-flex size-11 items-center justify-center rounded-full bg-brand-orange-ink text-white"
@@ -115,7 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       >
         <ul className="mx-auto flex h-[68px] max-w-lg items-stretch justify-around px-1">
-          {nav.slice(0, half).map((item) => (
+          {bottom.slice(0, half).map((item) => (
             <BottomLink key={item.href} item={item} active={isActive(pathname, item.href)} />
           ))}
           <li className="flex flex-1 justify-center">
@@ -130,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Registrar
             </button>
           </li>
-          {nav.slice(half).map((item) => (
+          {bottom.slice(half).map((item) => (
             <BottomLink key={item.href} item={item} active={isActive(pathname, item.href)} />
           ))}
         </ul>

@@ -1,6 +1,6 @@
 'use client';
 import { useId, useState, type ReactNode } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Table } from 'lucide-react';
 
 export interface ChartSeries {
@@ -186,5 +186,161 @@ export function Sparkline({ values, color = '#069494', label }: { values: number
       </svg>
       {label && <span className="text-[11px] text-ink-muted">{label}</span>}
     </div>
+  );
+}
+
+export interface DailyBar {
+  /** YYYY-MM-DD */
+  date: string;
+  /** null = no data for the day (rendered as a gap, never as zero) */
+  value: number | null;
+  /** extra note for the table ("Parcial (hoje)") */
+  note?: string;
+}
+
+/**
+ * One bar per local day. Days without data are GAPS (a dashed placeholder, labeled in the
+ * table) — never drawn as zero. An optional personal goal is a labeled reference line.
+ * Always paired with an accessible "Ver valores" table.
+ */
+export function DailyBarChart({
+  title,
+  days,
+  formatValue,
+  tickFormat,
+  rowLabel,
+  absentLabel,
+  goal,
+  goalLabel = 'Meta pessoal',
+  highlightDate,
+  color = '#7fd6d6',
+  highlightColor = '#ff8243',
+  height = 200,
+}: {
+  title: string;
+  days: DailyBar[];
+  formatValue: (v: number) => string;
+  tickFormat: (date: string) => string;
+  rowLabel: (date: string) => string;
+  absentLabel: string;
+  goal?: number | null;
+  goalLabel?: string;
+  highlightDate?: string;
+  color?: string;
+  highlightColor?: string;
+  height?: number;
+}) {
+  const [showTable, setShowTable] = useState(false);
+  const tableId = useId();
+  const values = days.map((d) => d.value).filter((v): v is number => v != null);
+  const top = Math.max(1, ...values, goal ?? 0);
+  // dashed placeholder height for absent days (a visual "no data" marker, not a value)
+  const gapHeight = top * 0.06;
+  const data = days.map((d) => ({ ...d, gap: d.value == null ? gapHeight : null }));
+  const hasAny = values.length > 0;
+
+  return (
+    <figure className="flex flex-col gap-3">
+      <figcaption className="sr-only">{title}</figcaption>
+      <div aria-hidden style={{ height }} className="w-full min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -8 }} barCategoryGap="18%">
+            <CartesianGrid stroke="#ebe6df" strokeDasharray="4 4" vertical={false} />
+            <XAxis dataKey="date" tickFormatter={tickFormat} tick={{ fontSize: 11, fill: '#574239' }} tickLine={false} axisLine={false} minTickGap={8} interval="preserveStartEnd" />
+            <YAxis
+              domain={[0, Math.ceil(top * 1.12)]}
+              tick={{ fontSize: 11, fill: '#574239' }}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+              allowDecimals={false}
+              tickFormatter={(v: number) => new Intl.NumberFormat('pt-BR', { notation: v >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(v)}
+            />
+            <Tooltip
+              cursor={{ fill: 'rgba(6,148,148,0.06)' }}
+              labelFormatter={(_, payload) => {
+                const p = payload?.[0]?.payload as DailyBar | undefined;
+                return p ? rowLabel(p.date) : '';
+              }}
+              formatter={(value, name, item) => {
+                const p = item?.payload as DailyBar | undefined;
+                if (name === 'gap' || p?.value == null) return [absentLabel, ''];
+                return [formatValue(Number(value)), ''];
+              }}
+              separator=""
+              contentStyle={{ borderRadius: 12, border: '1px solid #ebe6df', fontSize: 13 }}
+            />
+            <Bar dataKey="value" stackId="d" radius={[8, 8, 3, 3]} minPointSize={2} isAnimationActive={false}>
+              {data.map((d) => (
+                <Cell key={d.date} fill={d.date === highlightDate ? highlightColor : color} />
+              ))}
+            </Bar>
+            <Bar dataKey="gap" stackId="d" fill="transparent" stroke="#b8a89f" strokeDasharray="3 3" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+            {goal != null && goal > 0 && (
+              <ReferenceLine
+                y={goal}
+                stroke="#006a6a"
+                strokeDasharray="6 4"
+                strokeWidth={1.5}
+                label={{ value: goalLabel, position: 'insideTopRight', fill: '#006a6a', fontSize: 11 }}
+              />
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted" aria-label="Legenda">
+        <li className="flex items-center gap-1.5">
+          <span aria-hidden className="inline-block size-3 rounded-[3px] border border-dashed border-[#b8a89f]" />
+          Tracejado: {absentLabel}
+        </li>
+        {goal != null && goal > 0 && (
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="inline-block h-0 w-5 border-t-2 border-dashed border-brand-teal-ink" />
+            {goalLabel}: {formatValue(goal)}
+          </li>
+        )}
+        {!hasAny && <li>Nenhum dia com dados neste período.</li>}
+      </ul>
+      <div>
+        <button
+          type="button"
+          aria-expanded={showTable}
+          aria-controls={tableId}
+          onClick={() => setShowTable((v) => !v)}
+          className="inline-flex min-h-11 items-center gap-2 rounded-[12px] px-2 text-sm font-semibold text-brand-teal-ink hover:bg-brand-teal-wash"
+        >
+          <Table aria-hidden className="size-4" />
+          {showTable ? 'Ocultar valores' : 'Ver valores'}
+        </button>
+        <div id={tableId} hidden={!showTable} className="mt-2 max-h-72 overflow-auto rounded-field border border-line">
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">Valores de {title}</caption>
+            <thead className="sticky top-0 bg-surface-muted text-xs text-ink-muted">
+              <tr>
+                <th scope="col" className="px-3 py-2 font-semibold">
+                  Data
+                </th>
+                <th scope="col" className="px-3 py-2 font-semibold">
+                  Valor
+                </th>
+              </tr>
+            </thead>
+            <tbody className="tabular">
+              {[...days].reverse().map((d) => (
+                <tr key={d.date} className="border-t border-line">
+                  <th scope="row" className="px-3 py-2 font-medium">
+                    {rowLabel(d.date)}
+                  </th>
+                  <td className="px-3 py-2">
+                    {d.value == null ? <span className="text-ink-muted">{absentLabel}</span> : formatValue(d.value)}
+                    {d.note && <span className="ml-1 text-xs text-ink-muted">({d.note})</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </figure>
   );
 }

@@ -18,6 +18,8 @@ import { ConflictActions } from '@/shared/ui/ConflictActions';
 const MODULE_LABELS: Record<Module, { label: string; description: string }> = {
   body: { label: 'Corpo', description: 'Peso e medidas' },
   bloodPressure: { label: 'Pressão', description: 'Pressão arterial e pulso' },
+  hydration: { label: 'Água', description: 'Registros de água e meta pessoal opcional' },
+  activity: { label: 'Atividade', description: 'Passos e exercícios recebidos do Auto Export (somente leitura)' },
   routine: { label: 'Rotina', description: 'Medicamentos, vitaminas e suplementos' },
 };
 
