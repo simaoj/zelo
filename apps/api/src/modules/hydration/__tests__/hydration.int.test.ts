@@ -28,6 +28,13 @@ describe('indexes', () => {
   });
 });
 
+describe('openapi', () => {
+  it('documents the hydration routes', async () => {
+    const doc = (await a.get('/openapi.json')).json() as { paths: Record<string, unknown> };
+    for (const p of ['/api/v1/water-entries', '/api/v1/water-entries/{id}', '/api/v1/hydration/summary', '/api/v1/hydration/goal']) expect(doc.paths).toHaveProperty([p]);
+  });
+});
+
 describe('water entries', () => {
   it('create, edit, delete (tombstone), undo by re-creating; version conflicts', async () => {
     const c = ctx.client();
