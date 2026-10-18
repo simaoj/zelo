@@ -43,6 +43,20 @@ import type {
   WeightGoal,
   WeightPage,
   ApiError,
+  ActivityGoal,
+  ActivityToday,
+  CreateWaterEntryRequest,
+  HydrationGoal,
+  HydrationSummary,
+  PutActivityGoalRequest,
+  PutHydrationGoalRequest,
+  StepsSummary,
+  UpdateWaterEntryRequest,
+  WaterEntry,
+  WaterEntryPage,
+  Workout,
+  WorkoutPage,
+  WorkoutsQuery,
 } from '@zelo/contracts';
 
 /** Thrown by data sources for any non-2xx answer (or synthesized locally). */
@@ -120,6 +134,26 @@ export interface ZeloDataSource {
   listIntakes(q: HistoryQuery): Promise<{ items: IntakeRecord[]; nextCursor: string | null }>;
   updateIntake(id: string, input: UpdateIntakeRequest): Promise<IntakeRecord>;
   deleteIntake(id: string, input: DeleteRequest): Promise<void>;
+
+  // hydration (entries work offline through the existing queue; goal is online only)
+  listWaterEntries(q: HistoryQuery): Promise<WaterEntryPage>;
+  createWaterEntry(input: CreateWaterEntryRequest): Promise<Mutation<WaterEntry>>;
+  updateWaterEntry(id: string, input: UpdateWaterEntryRequest): Promise<Mutation<WaterEntry>>;
+  deleteWaterEntry(id: string, input: DeleteRequest): Promise<Mutation<null>>;
+  /** from/to: inclusive local dates (profile tz) */
+  getHydrationSummary(from: string, to: string): Promise<HydrationSummary>;
+  getHydrationGoal(): Promise<HydrationGoal | null>;
+  putHydrationGoal(input: PutHydrationGoalRequest): Promise<HydrationGoal>; // online only
+  deleteHydrationGoal(): Promise<void>; // online only
+
+  // activity — READ-ONLY data received from Health Auto Export (served from cache offline when available)
+  getActivityToday(date?: string): Promise<ActivityToday>;
+  getStepsSummary(from: string, to: string): Promise<StepsSummary>;
+  listWorkouts(q: WorkoutsQuery): Promise<WorkoutPage>;
+  getWorkout(id: string): Promise<Workout>;
+  getActivityGoal(): Promise<ActivityGoal | null>;
+  putActivityGoal(input: PutActivityGoalRequest): Promise<ActivityGoal>; // online only
+  deleteActivityGoal(): Promise<void>; // online only
 
   /** Called after any successful mutation so hooks can refetch. Returns unsubscribe. */
   subscribe(listener: () => void): () => void;

@@ -27,6 +27,7 @@
     "argon2": "^0.45.1",
     "fastify": "5.12.7",
     "fastify-type-provider-zod": "^7.0.0",
+    "luxon": "^3.7.2",
     "mongodb": "7.7.0",
     "nodemailer": "^10.1.2",
     "pino": "^10.4.0",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/luxon": "^3.7.6",
     "@types/node": "^26.6.5",
     "@types/nodemailer": "^8.0.2",
     "@types/web-push": "^3.6.4",

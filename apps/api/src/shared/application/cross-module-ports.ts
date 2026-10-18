@@ -2,7 +2,7 @@
  * Ports one module exposes to another (implemented by the owning module, injected by bootstrap).
  * Return contract (transport) shapes from @zelo/contracts so consumers don't touch internals.
  */
-import type { BloodPressureEntry, MeasurementSession, WeightEntry } from '@zelo/contracts';
+import type { ActivityToday, BloodPressureEntry, DashboardResponse, MeasurementSession, WeightEntry } from '@zelo/contracts';
 
 /** Implemented by `profile` module (backend-core). Used by routine/dashboard/notifications. */
 export interface ProfileReader {
@@ -24,4 +24,14 @@ export interface HealthSnapshotReader {
 /** Implemented by `notifications` module (backend-routine). Used by identity on logout / account deletion. */
 export interface PushSubscriptionRevoker {
   revokeForDevice(userId: string, deviceId: string): Promise<void>;
+}
+
+/** Implemented by `hydration` module. Used by dashboard. `date` is a local date in the profile tz. */
+export interface HydrationSnapshotReader {
+  dayFor(userId: string, date: string, timezone: string): Promise<DashboardResponse['hydration']>;
+}
+
+/** Implemented by `activity` module. Used by dashboard. */
+export interface ActivitySnapshotReader {
+  todayFor(userId: string, date: string, timezone: string): Promise<ActivityToday>;
 }

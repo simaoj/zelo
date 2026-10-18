@@ -20,6 +20,8 @@ import {
   PutOccurrenceIntakeRequest,
   RoutineItem,
 } from './routine.js';
+import { CreateWaterEntryRequest, HydrationGoal, UpdateWaterEntryRequest, WaterEntry } from './hydration.js';
+import { ActivityGoal, ActivityToday, DailySteps, Workout } from './activity.js';
 
 // ---------- Dashboard ----------
 
@@ -35,6 +37,15 @@ export const DashboardResponse = z.object({
   latestMeasurement: MeasurementSession.nullable(),
   /** occurrences of `date`, ordered by scheduledAt */
   occurrences: z.array(Occurrence),
+  /** water of `date` in the profile tz; totalMl null = no records that day */
+  hydration: z.object({
+    totalMl: z.number().int().nonnegative().nullable(),
+    entryCount: z.number().int().nonnegative(),
+    goal: HydrationGoal.nullable(),
+    lastEntryAt: Instant.nullable(),
+  }),
+  /** received (read-only) activity data for `date` */
+  activity: ActivityToday,
 });
 export type DashboardResponse = z.infer<typeof DashboardResponse>;
 
@@ -54,6 +65,11 @@ export const SYNC_ENTITIES = [
   'routineItem',
   'occurrence',
   'intakeRecord',
+  'waterEntry',
+  'hydrationGoal',
+  'dailySteps',
+  'activityGoal',
+  'workout',
 ] as const;
 export const SyncEntity = z.enum(SYNC_ENTITIES);
 export type SyncEntity = z.infer<typeof SyncEntity>;
@@ -76,6 +92,14 @@ export const SyncBootstrapResponse = z.object({
   /** occurrences from 7 days ago until 7 days ahead (profile tz) */
   occurrences: z.array(Occurrence),
   intakeRecords: z.array(IntakeRecord),
+  /** water entries of the last 90 days (profile tz) */
+  waterEntries: z.array(WaterEntry),
+  hydrationGoal: HydrationGoal.nullable(),
+  /** received daily steps of the last 90 days (read-only) */
+  dailySteps: z.array(DailySteps),
+  activityGoal: ActivityGoal.nullable(),
+  /** received workouts of the last 90 days (read-only) */
+  workouts: z.array(Workout),
 });
 export type SyncBootstrapResponse = z.infer<typeof SyncBootstrapResponse>;
 
@@ -102,6 +126,9 @@ export const SyncOperation = z.discriminatedUnion('type', [
   /** entityId = occurrenceId */
   z.object({ type: z.literal('occurrence.intake.delete'), entityId: Id, payload: DeleteRequest }),
   z.object({ type: z.literal('intake.create'), entityId: Id, payload: CreateIntakeRequest }),
+  z.object({ type: z.literal('water.create'), entityId: Id, payload: CreateWaterEntryRequest }),
+  z.object({ type: z.literal('water.update'), entityId: Id, payload: UpdateWaterEntryRequest }),
+  z.object({ type: z.literal('water.delete'), entityId: Id, payload: DeleteRequest }),
 ]);
 export type SyncOperation = z.infer<typeof SyncOperation>;
 export type SyncOperationType = SyncOperation['type'];

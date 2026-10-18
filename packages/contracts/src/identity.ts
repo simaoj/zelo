@@ -32,7 +32,7 @@ export type SessionUser = z.infer<typeof SessionUser>;
 export const SessionResponse = z.object({ user: SessionUser, expiresAt: Instant });
 export type SessionResponse = z.infer<typeof SessionResponse>;
 
-export const MODULES = ['body', 'bloodPressure', 'routine'] as const;
+export const MODULES = ['body', 'bloodPressure', 'hydration', 'activity', 'routine'] as const;
 export const Module = z.enum(MODULES);
 export type Module = z.infer<typeof Module>;
 

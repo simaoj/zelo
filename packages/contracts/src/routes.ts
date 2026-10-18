@@ -40,6 +40,20 @@ export const routes = {
   occurrenceIntake: (id: string) => `/occurrences/${id}/intake`, // PUT, DELETE (undo)
   intakes: '/intakes', // GET HistoryQuery(+itemId), POST ad-hoc
   intake: (id: string) => `/intakes/${id}`, // PATCH, DELETE
+  waterEntries: '/water-entries', // GET HistoryQuery, POST CreateWaterEntryRequest
+  waterEntry: (id: string) => `/water-entries/${id}`, // PATCH, DELETE
+  hydrationSummary: '/hydration/summary', // GET ?from&to (local dates)
+  hydrationGoal: '/hydration/goal', // GET (404 none), PUT, DELETE
+  activityToday: '/activity/today', // GET ?date= → ActivityToday
+  activitySteps: '/activity/steps', // GET ?from&to → StepsSummary
+  activityGoal: '/activity/goal', // GET (404 none), PUT, DELETE
+  workouts: '/activity/workouts', // GET WorkoutsQuery → WorkoutPage
+  workout: (id: string) => `/activity/workouts/${id}`, // GET → Workout
+  /**
+   * POST — Health Auto Export receiver. Auth: `Authorization: Bearer <integration token>`
+   * (NOT the session cookie; no CSRF). Body ≤ HEALTH_IMPORT_MAX_BYTES. → HealthImportResponse
+   */
+  healthImport: '/imports/health',
   syncBootstrap: '/sync/bootstrap',
   syncChanges: '/sync/changes', // GET ?cursor=
   syncOperations: '/sync/operations', // POST

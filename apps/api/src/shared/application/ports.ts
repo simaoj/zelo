@@ -40,7 +40,12 @@ export type SyncEntityName =
   | 'bloodPressureEntry'
   | 'routineItem'
   | 'occurrence'
-  | 'intakeRecord';
+  | 'intakeRecord'
+  | 'waterEntry'
+  | 'hydrationGoal'
+  | 'dailySteps'
+  | 'activityGoal'
+  | 'workout';
 
 export interface ChangeLog {
   record(
