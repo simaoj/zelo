@@ -113,13 +113,13 @@ export function TodayPage() {
                   <div className="flex size-11 items-center justify-center rounded-[14px] bg-wash-peach text-brand-orange-ink">
                     <HeartPulse aria-hidden className="size-5" />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[10rem] flex-1">
                     <h3 className="font-semibold">Pressão arterial</h3>
                     <p className="text-sm text-ink-muted">
                       {d.latestBloodPressure ? `Último registro: ${describeInstant(d.latestBloodPressure.measuredAt, tz)}` : 'Nenhum registro ainda'}
                     </p>
                   </div>
-                  <Button variant="primary" onClick={() => open('bloodPressure')} icon={<Plus aria-hidden className="size-4" />}>
+                  <Button variant="primary" className="w-full sm:w-auto" onClick={() => open('bloodPressure')} icon={<Plus aria-hidden className="size-4" />}>
                     Registrar pressão
                   </Button>
                 </div>

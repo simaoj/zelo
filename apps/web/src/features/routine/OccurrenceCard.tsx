@@ -34,7 +34,7 @@ export function StateBadge({ state }: { state: ReturnType<typeof effectiveState>
   );
 }
 
-export function OccurrenceCard({ occurrence: o, tz, compact }: { occurrence: Occurrence; tz: string; compact?: boolean }) {
+export function OccurrenceCard({ occurrence: o, tz }: { occurrence: Occurrence; tz: string; compact?: boolean }) {
   const { markTaken, markNotTaken, undo, pending } = useOccurrenceActions();
   const [editing, setEditing] = useState(false);
   const state = effectiveState(o);
@@ -56,12 +56,12 @@ export function OccurrenceCard({ occurrence: o, tz, compact }: { occurrence: Occ
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="tabular text-[13px] font-bold text-brand-orange-ink">{o.localTime}</span>
             <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold', style.chip)}>{ROUTINE_TYPE_LABELS[o.itemType]}</span>
+            <StateBadge state={state} />
           </div>
           <h3 className="mt-0.5 break-words text-[17px] font-semibold text-ink">{o.nameSnapshot}</h3>
           <p className="text-sm text-ink-muted">Dose: {formatDose(o.doseSnapshot, o.unitSnapshot)}</p>
           {o.intake?.notes && <p className="mt-1 text-sm italic text-ink-muted">“{o.intake.notes}”</p>}
         </div>
-        <StateBadge state={state} />
       </div>
       <div className={cx('flex flex-wrap items-center gap-2 border-t border-line/70 px-4 py-3', decided && 'bg-surface-muted/50')}>
         {decided ? (
@@ -87,17 +87,17 @@ export function OccurrenceCard({ occurrence: o, tz, compact }: { occurrence: Occ
           <>
             <Button
               variant="primary"
-              className={cx('flex-1', compact ? 'min-w-[10rem]' : 'min-w-[12rem]')}
+              className="w-full sm:w-auto sm:flex-1"
               pending={busy}
               onClick={() => void markTaken(o)}
               icon={<Check aria-hidden className="size-5" />}
             >
               Marcar como tomado
             </Button>
-            <Button size="md" variant="soft" disabled={busy} onClick={() => void markNotTaken(o)} icon={<X aria-hidden className="size-4" />}>
+            <Button size="md" variant="soft" className="flex-1 sm:flex-none" disabled={busy} onClick={() => void markNotTaken(o)} icon={<X aria-hidden className="size-4" />}>
               Não tomado
             </Button>
-            <Button size="md" variant="ghost" disabled={busy} onClick={() => setEditing(true)} icon={<Clock aria-hidden className="size-4" />}>
+            <Button size="md" variant="ghost" className="flex-1 sm:flex-none" disabled={busy} onClick={() => setEditing(true)} icon={<Clock aria-hidden className="size-4" />}>
               Outro horário
             </Button>
           </>

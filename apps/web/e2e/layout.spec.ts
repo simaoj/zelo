@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import { APP_PAGES, PUBLIC_PAGES, signUpViaApi } from './helpers';
 
 const WIDTHS = [320, 390, 768, 1440];
-const FORBIDDEN = /refei[çc][ãa]o|refei[çc][õo]es|dieta|caloria|almo[çc]o|jantar|caf[ée] da manh[ãa]|hidrata[çc][ãa]o|[áa]gua/i;
+// whole words only (timezone names like "America/Araguaina" must not match "água")
+const FORBIDDEN = /(?<!\p{L})(refei[çc][ãa]o|refei[çc][õo]es|dieta|calorias?|almo[çc]o|jantar|caf[ée] da manh[ãa]|hidrata[çc][ãa]o|[áa]gua)(?!\p{L})/iu;
 
 test('no horizontal scroll at 320/390/768/1440 and nothing hidden behind the bottom nav', async ({ page }) => {
   await signUpViaApi(page);

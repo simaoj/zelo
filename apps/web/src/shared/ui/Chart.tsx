@@ -1,6 +1,6 @@
 'use client';
 import { useId, useState, type ReactNode } from 'react';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Table } from 'lucide-react';
 
 export interface ChartSeries {
@@ -76,8 +76,9 @@ export function TimeLineChart({
               tick={{ fontSize: 11, fill: '#574239' }}
               tickLine={false}
               axisLine={false}
-              width={44}
+              width={52}
               allowDecimals
+              tickFormatter={(v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v)}
             />
             <Tooltip
               labelFormatter={(_, payload) => (payload?.[0]?.payload as ChartPoint | undefined)?.label ?? ''}
@@ -87,7 +88,6 @@ export function TimeLineChart({
               }}
               contentStyle={{ borderRadius: 12, border: '1px solid #ebe6df', fontSize: 13 }}
             />
-            {series.length > 1 && <Legend verticalAlign="top" height={28} iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
             {series.map((s) => (
               <Line
                 key={s.key}
