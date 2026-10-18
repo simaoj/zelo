@@ -38,7 +38,7 @@ test('water quick add saves immediately and can be undone', async ({ page }) => 
   await expect(page.getByText('+300 ml registrado')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Registros de hoje' })).toBeVisible();
   await expect(page.locator('li', { hasText: '300 ml' }).first()).toBeVisible();
-  await expect(page.getByText('Total: 300 ml')).toBeVisible();
+  await expect(page.locator('span', { hasText: 'Total: 300 ml' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Desfazer' }).click();
   await expect(page.getByText('Registro desfeito')).toBeVisible();
@@ -58,14 +58,14 @@ test('custom water entry: create, edit, delete; personal goal set and removed', 
   await dialog.getByLabel(/Quantidade/).fill('450');
   await dialog.getByRole('button', { name: 'Registrar água' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText('Total: 450 ml')).toBeVisible();
+  await expect(page.locator('span', { hasText: 'Total: 450 ml' })).toBeVisible();
 
   await page.getByRole('button', { name: /^Editar 450 ml/ }).click();
   const edit = page.getByRole('dialog', { name: 'Editar registro de água' });
   await edit.getByLabel(/Quantidade/).fill('600');
   await edit.getByRole('button', { name: 'Salvar alterações' }).click();
   await expect(edit).toBeHidden();
-  await expect(page.getByText('Total: 600 ml')).toBeVisible();
+  await expect(page.locator('span', { hasText: 'Total: 600 ml' })).toBeVisible();
 
   await page.getByRole('button', { name: /^Excluir 600 ml/ }).click();
   await page.getByRole('dialog', { name: /Excluir este registro de água/ }).getByRole('button', { name: 'Excluir' }).click();
@@ -77,7 +77,7 @@ test('custom water entry: create, edit, delete; personal goal set and removed', 
   await goal.getByLabel(/Meta diária/).fill('2000');
   await goal.getByRole('button', { name: 'Salvar meta' }).click();
   await expect(goal).toBeHidden();
-  await expect(page.getByText('Meta pessoal: 2.000 ml')).toBeVisible();
+  await expect(page.getByText('Meta pessoal: 2.000 ml').first()).toBeVisible();
   await page.getByRole('button', { name: 'Ajustar' }).click();
   const adjust = page.getByRole('dialog', { name: /Ajustar meta pessoal de água/ });
   await adjust.getByRole('button', { name: 'Remover meta' }).click();
@@ -172,7 +172,8 @@ test('received Auto Export data (steps + workout v2) renders read-only in Ativid
   await expect(card).toContainText('4,2 km');
   await expect(card).toContainText('310 kcal ativas');
   await card.click();
-  await expect(page).toHaveURL(new RegExp(`/atividade/exercicios/detalhe\\?id=${workoutId}$`));
+  // Zelo assigns its own id; the exported id is only the dedup key
+  await expect(page).toHaveURL(/\/atividade\/exercicios\/detalhe\?id=[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Corrida' })).toBeVisible();
   await expect(page.getByText('Origem: Health Auto Export')).toBeVisible();
   await expect(page.getByText(/Recebido em \d\d\/\d\d\/\d{4} às/)).toBeVisible();
