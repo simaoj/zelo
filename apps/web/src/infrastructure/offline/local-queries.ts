@@ -3,6 +3,18 @@
  * (history paging, deltaKg, occurrence state derivation, dashboard composition).
  */
 import type {
+  ActivityGoal,
+  ActivityToday,
+  DailySteps,
+  HydrationDay,
+  HydrationGoal,
+  HydrationSummary,
+  StepsDay,
+  StepsSummary,
+  WaterEntry,
+  Workout,
+  WorkoutPage,
+  WorkoutsQuery,
   DashboardResponse,
   HistoryQuery,
   MeasurementSession,
@@ -108,6 +120,121 @@ export function localDateIn(timezone: string, now: Date): string {
   }
 }
 
+/** Inclusive list of YYYY-MM-DD dates (calendar arithmetic, tz-independent). Empty if from > to. */
+export function datesBetween(from: string, to: string, max = 400): string[] {
+  const out: string[] = [];
+  const end = Date.parse(`${to}T00:00:00.000Z`);
+  for (let t = Date.parse(`${from}T00:00:00.000Z`); t <= end && out.length < max; t += 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+const maxIso = (values: Array<string | null | undefined>): string | null =>
+  values.reduce<string | null>((acc, v) => (v && (!acc || Date.parse(v) > Date.parse(acc)) ? v : acc), null);
+
+// ---------- hydration ----------
+
+/** Water history paging: same semantics as the API ([from, to) on consumedAt, desc, cursor). */
+export function pageWater(entries: WaterEntry[], q: HistoryQuery): { items: WaterEntry[]; nextCursor: string | null } {
+  const res = pageLocal(entries.map((e) => ({ ...e, measuredAt: e.consumedAt })), q);
+  return {
+    items: res.items.map(({ measuredAt: _m, ...e }) => {
+      void _m;
+      return e as WaterEntry;
+    }),
+    nextCursor: res.nextCursor,
+  };
+}
+
+/** Groups water by local date in the PROFILE timezone. Days without records → totalMl null. */
+export function summarizeHydration(input: { from: string; to: string; timezone: string; entries: WaterEntry[]; goal: HydrationGoal | null }): HydrationSummary {
+  const byDay = new Map<string, { total: number; count: number }>();
+  for (const e of input.entries) {
+    const d = localDateIn(input.timezone, new Date(e.consumedAt));
+    const cur = byDay.get(d) ?? { total: 0, count: 0 };
+    cur.total += e.amountMl;
+    cur.count += 1;
+    byDay.set(d, cur);
+  }
+  const days: HydrationDay[] = datesBetween(input.from, input.to).map((date) => {
+    const v = byDay.get(date);
+    return { date, totalMl: v ? v.total : null, entryCount: v?.count ?? 0 };
+  });
+  const recorded = days.filter((d) => d.totalMl !== null);
+  return {
+    timezone: input.timezone,
+    from: input.from,
+    to: input.to,
+    days,
+    goal: input.goal,
+    averageMlOnRecordedDays: recorded.length ? Math.round(recorded.reduce((a, d) => a + d.totalMl!, 0) / recorded.length) : null,
+  };
+}
+
+export function hydrationForDay(date: string, timezone: string, entries: WaterEntry[], goal: HydrationGoal | null): DashboardResponse['hydration'] {
+  const ofDay = entries.filter((e) => localDateIn(timezone, new Date(e.consumedAt)) === date);
+  return {
+    totalMl: ofDay.length ? ofDay.reduce((a, e) => a + e.amountMl, 0) : null,
+    entryCount: ofDay.length,
+    goal,
+    lastEntryAt: maxIso(ofDay.map((e) => e.consumedAt)),
+  };
+}
+
+// ---------- activity (read-only replica) ----------
+
+export function lastActivityReceivedAt(steps: DailySteps[], workouts: Workout[]): string | null {
+  return maxIso([...steps.map((s) => s.receivedAt), ...workouts.map((w) => w.receivedAt)]);
+}
+
+function stepsDay(date: string, today: string, rec: DailySteps | undefined): StepsDay {
+  return { date, count: rec ? rec.count : null, partial: date === today, receivedAt: rec?.receivedAt ?? null };
+}
+
+/** count null = no data received; 0 = reported zero; `partial` for today (profile tz). */
+export function summarizeSteps(input: { from: string; to: string; today: string; steps: DailySteps[]; workouts: Workout[]; goal: ActivityGoal | null }): StepsSummary {
+  const byDate = new Map(input.steps.map((s) => [s.localDate, s]));
+  const days = datesBetween(input.from, input.to).map((d) => stepsDay(d, input.today, byDate.get(d)));
+  const withData = days.filter((d) => d.count !== null);
+  return {
+    from: input.from,
+    to: input.to,
+    days,
+    goal: input.goal,
+    averageOnDaysWithData: withData.length ? Math.round(withData.reduce((a, d) => a + d.count!, 0) / withData.length) : null,
+    lastReceivedAt: lastActivityReceivedAt(input.steps, input.workouts),
+  };
+}
+
+export function activityForDay(input: { date: string; today: string; steps: DailySteps[]; workouts: Workout[]; goal: ActivityGoal | null }): ActivityToday {
+  const ofDay = input.workouts.filter((w) => w.localDate === input.date);
+  return {
+    date: input.date,
+    steps: stepsDay(input.date, input.today, input.steps.find((s) => s.localDate === input.date)),
+    stepsGoal: input.goal,
+    workoutCount: ofDay.length,
+    workoutSeconds: ofDay.reduce((a, w) => a + w.durationSeconds, 0),
+    lastReceivedAt: lastActivityReceivedAt(input.steps, input.workouts),
+  };
+}
+
+/** Workouts ordered by startedAt desc; from/to are inclusive local dates; name is exact. */
+export function pageWorkouts(workouts: Workout[], q: WorkoutsQuery): WorkoutPage {
+  const filtered = workouts.filter(
+    (w) => (!q.from || w.localDate >= q.from) && (!q.to || w.localDate <= q.to) && (!q.name || w.name === q.name),
+  );
+  const res = pageLocal(filtered.map((w) => ({ ...w, measuredAt: w.startedAt })), { cursor: q.cursor, limit: q.limit });
+  return {
+    items: res.items.map(({ measuredAt: _m, ...w }) => {
+      void _m;
+      return w as Workout;
+    }),
+    nextCursor: res.nextCursor,
+    availableNames: [...new Set(workouts.map((w) => w.name))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  };
+}
+
 export function composeDashboard(input: {
   date: string;
   profile: Profile;
@@ -115,8 +242,14 @@ export function composeDashboard(input: {
   bloodPressure: BloodPressureEntry[];
   measurements: MeasurementSession[];
   occurrences: Occurrence[];
+  water: WaterEntry[];
+  hydrationGoal: HydrationGoal | null;
+  steps: DailySteps[];
+  workouts: Workout[];
+  activityGoal: ActivityGoal | null;
   now: Date;
 }): DashboardResponse {
+  const today = localDateIn(input.profile.timezone, input.now);
   const weightsDesc = withDeltas(input.weights).sort(byMeasuredDesc);
   const sparkline = weightsDesc
     .slice(0, 30)
@@ -134,5 +267,7 @@ export function composeDashboard(input: {
       input.occurrences.filter((o) => o.localDate === input.date),
       input.now,
     ),
+    hydration: hydrationForDay(input.date, input.profile.timezone, input.water, input.hydrationGoal),
+    activity: activityForDay({ date: input.date, today, steps: input.steps, workouts: input.workouts, goal: input.activityGoal }),
   };
 }

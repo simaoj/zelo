@@ -13,6 +13,9 @@ export const OPERATION_LABELS: Record<string, string> = {
   'occurrence.intake.put': 'Registro de tomada',
   'occurrence.intake.delete': 'Tomada desfeita',
   'intake.create': 'Tomada avulsa',
+  'water.create': 'Novo registro de água',
+  'water.update': 'Edição de água',
+  'water.delete': 'Exclusão de água',
 };
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -26,6 +29,8 @@ export const FIELD_LABELS: Record<string, string> = {
   status: 'Situação',
   actualTakenAt: 'Horário da tomada',
   nameSnapshot: 'Item',
+  amountMl: 'Quantidade (ml)',
+  consumedAt: 'Horário',
 };
 
 const HIDDEN = new Set(['id', 'version', 'createdAt', 'updatedAt', 'deltaKg', 'timezone', 'operationId', 'expectedVersion', 'intakeId', 'itemId', 'occurrenceId', 'doseSnapshot', 'unitSnapshot', 'confirmedUnusual']);
@@ -39,7 +44,8 @@ const dateTime = (iso: string) => {
 export function formatField(key: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (key === 'weightKg') return `${dec(String(value))} kg`;
-  if (key === 'measuredAt' || key === 'actualTakenAt') return dateTime(String(value));
+  if (key === 'measuredAt' || key === 'actualTakenAt' || key === 'consumedAt') return dateTime(String(value));
+  if (key === 'amountMl') return `${Number(value).toLocaleString('pt-BR')} ml`;
   if (key === 'pulseBpm') return `${value} bpm`;
   if (key === 'systolic' || key === 'diastolic') return `${value} mmHg`;
   if (key === 'status') return OCCURRENCE_STATE_LABELS[value as keyof typeof OCCURRENCE_STATE_LABELS] ?? String(value);

@@ -2,17 +2,20 @@
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WeightEntry } from '@zelo/contracts';
+import type { WaterEntry, WeightEntry } from '@zelo/contracts';
+import { FIELD_LABELS, OPERATION_LABELS, formatField } from '@/pwa/labels';
 import { OfflineError } from '@/shared/data/ports';
 import { createOfflineDataLayer } from '../index';
 import { OfflineRuntime, createOfflineAuth, createOfflineDataSource, createOfflineSyncPort, isSignOutCancelled } from '../layer';
 import { ZeloDb, dbName } from '../db';
-import { FakeServer, U1, U2, memoryStorage, uuid, weightInput } from './fakes';
+import { DeviceFlags } from '../flags';
+import { FakeServer, U1, U2, memoryStorage, session, steps, uuid, waterInput, weightInput, workout } from './fakes';
 
 const layers: Array<{ sync: { dispose(): void } }> = [];
 
-function makeLayer(server: FakeServer, storage = memoryStorage()) {
+function makeLayer(server: FakeServer, storage = memoryStorage(), now?: () => Date) {
   const layer = createOfflineDataLayer(server.http(), server.auth, {
+    now,
     api: server.api,
     storage,
     isOnline: () => server.online,
@@ -24,8 +27,8 @@ function makeLayer(server: FakeServer, storage = memoryStorage()) {
   return layer;
 }
 
-async function enabledLayer(server = new FakeServer(), storage = memoryStorage()) {
-  const layer = makeLayer(server, storage);
+async function enabledLayer(server = new FakeServer(), storage = memoryStorage(), now?: () => Date) {
+  const layer = makeLayer(server, storage, now);
   await layer.auth.getSession();
   await layer.sync.enableOffline();
   return { server, storage, layer };
@@ -438,12 +441,66 @@ describe('schema migration', () => {
 
     const db = new ZeloDb(U1);
     await db.open();
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(3);
     expect(await db.weightEntries.count()).toBe(1);
     const [op] = await db.operations.toArray();
     expect(op).toMatchObject({ operationId: w.operationId, chained: false, nextAttemptAt: null, state: 'pending' });
     expect(await db.drafts.count()).toBe(0);
+    expect(await db.waterEntries.count()).toBe(0);
     db.close();
+  });
+
+  it('upgrading from v2 → v3 keeps data and pending ops, adds water/activity tables and refetches the snapshot', async () => {
+    const v2 = new Dexie(dbName(U1));
+    v2.version(1).stores({
+      profile: 'userId',
+      weightEntries: 'id, measuredAt',
+      weightGoal: 'key',
+      measurementSessions: 'id, measuredAt',
+      bloodPressureEntries: 'id, measuredAt',
+      routineItems: 'id',
+      occurrences: 'id, localDate, itemId',
+      intakeRecords: 'id, occurrenceId, itemId',
+      operations: '++seq, &operationId, entityId, state',
+      meta: 'key',
+    });
+    v2.version(2).stores({ operations: '++seq, &operationId, entityId, state, ownerUserId', drafts: 'key' });
+    await v2.open();
+    const server = new FakeServer();
+    const w = weightInput('82.35');
+    const local = { ...w, version: 0, createdAt: w.measuredAt, updatedAt: w.measuredAt, notes: null, deltaKg: null };
+    delete (local as { operationId?: string }).operationId;
+    await v2.table('profile').put(server.profile());
+    await v2.table('weightEntries').put(local);
+    await v2.table('operations').add({ operationId: w.operationId, ownerUserId: U1, entityId: w.id, type: 'weight.create', payload: w, expectedVersion: null, chained: false, createdAt: w.measuredAt, state: 'pending', attempts: 0, lastError: null, remote: null, localSnapshot: local, nextAttemptAt: null });
+    await v2.table('meta').put({ key: 'cursor', value: '0' });
+    await v2.table('drafts').put({ key: 'peso', value: { weightKg: '80' }, updatedAt: w.measuredAt });
+    v2.close();
+
+    const db = new ZeloDb(U1);
+    await db.open();
+    expect(db.verno).toBe(3);
+    expect(await db.weightEntries.count()).toBe(1);
+    expect(await db.drafts.count()).toBe(1);
+    expect((await db.operations.toArray()).map((o) => [o.operationId, o.state])).toEqual([[w.operationId, 'pending']]);
+    expect(await db.waterEntries.count()).toBe(0);
+    expect(await db.workouts.count()).toBe(0);
+    expect((await db.meta.get('forceBootstrap'))?.value).toBe(true);
+    db.close();
+
+    // the app (already opted in) syncs: new snapshot brings water, the pending op is sent once
+    const existing = waterInput(250, '2026-10-17T12:00:00.000Z');
+    server.upsertWater({ id: existing.id, consumedAt: existing.consumedAt, timezone: existing.timezone, amountMl: 250, notes: null, version: 1, createdAt: existing.consumedAt, updatedAt: existing.consumedAt });
+    const storage = memoryStorage();
+    const flags = new DeviceFlags(storage);
+    flags.offlineEnabled = true;
+    flags.identity = session(U1);
+    const layer = makeLayer(server, storage);
+    await layer.sync.syncNow();
+    expect(server.operationCalls.flat().map((o) => (o.payload as { operationId: string }).operationId)).toEqual([w.operationId]);
+    expect(server.weights.size).toBe(1);
+    expect((await layer.data.listWaterEntries({})).items.map((e) => e.amountMl)).toEqual([250]);
+    expect(layer.sync.getStatus().pendingCount).toBe(0);
   });
 });
 
@@ -457,6 +514,349 @@ describe('status listeners', () => {
     expect(fn).toHaveBeenCalled();
     expect(fn.mock.calls.at(-1)![0].pendingCount).toBe(1);
     off();
+  });
+});
+
+// ======================================================================
+// Água (offline through the existing queue) + atividade (read-only replica)
+// ======================================================================
+
+describe('water offline', () => {
+  it('create offline → new layer instance → reconnect → exactly ONE operation with the same operationId', async () => {
+    const storage = memoryStorage();
+    const { server, layer } = await enabledLayer(new FakeServer(), storage);
+    server.online = false;
+    const input = waterInput(300);
+    const res = await layer.data.createWaterEntry(input);
+    expect(res.persistence).toBe('local');
+    expect(res.value).toMatchObject({ id: input.id, amountMl: 300, version: 0, notes: null });
+    const db = rawDb(U1);
+    expect(await db.waterEntries.get(input.id)).toBeTruthy();
+    expect(await db.operations.toArray()).toEqual([expect.objectContaining({ type: 'water.create', operationId: input.operationId, entityId: input.id, state: 'pending' })]);
+    db.close();
+    layer.sync.dispose();
+
+    const reopened = makeLayer(server, storage);
+    expect((await reopened.auth.getSession())?.user.userId).toBe(U1);
+    expect((await reopened.data.listWaterEntries({})).items.map((e) => e.id)).toEqual([input.id]);
+    expect(await reopened.sync.listProblemOperations()).toEqual([expect.objectContaining({ state: 'pending', type: 'water.create' })]);
+
+    server.online = true;
+    await reopened.sync.syncNow();
+    await reopened.sync.syncNow();
+    expect(server.operationCalls).toHaveLength(1);
+    expect(server.operationCalls[0]!.map((o) => [o.type, (o.payload as { operationId: string }).operationId])).toEqual([['water.create', input.operationId]]);
+    expect(server.water.size).toBe(1);
+    expect((await reopened.data.listWaterEntries({})).items[0]).toMatchObject({ id: input.id, version: 1 });
+    expect(reopened.sync.getStatus()).toMatchObject({ pendingCount: 0, conflictCount: 0, errorCount: 0 });
+  });
+
+  it('online with offline enabled goes straight to the server (persistence server) and mirrors locally', async () => {
+    const { server, layer } = await enabledLayer();
+    const input = waterInput(200);
+    const res = await layer.data.createWaterEntry(input);
+    expect(res.persistence).toBe('server');
+    expect(server.water.size).toBe(1);
+    server.online = false;
+    expect((await layer.data.listWaterEntries({})).items[0]).toMatchObject({ id: input.id, version: 1 });
+  });
+
+  it('a lost response is replayed with the same operationId without duplicating', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    const input = waterInput(500);
+    await layer.data.createWaterEntry(input);
+    server.online = true;
+    server.loseNextResponse = true;
+    await layer.sync.syncNow();
+    expect(layer.sync.getStatus().pendingCount).toBe(1);
+    await layer.sync.syncNow();
+    expect(server.operationCalls).toHaveLength(2);
+    expect(server.operationCalls.flat().every((o) => (o.payload as { operationId: string }).operationId === input.operationId)).toBe(true);
+    expect(server.applied).toBe(1);
+    expect(server.water.size).toBe(1);
+    expect(layer.sync.getStatus().pendingCount).toBe(0);
+  });
+
+  it('preserves create → update → delete order and rebases versions', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    const input = waterInput(200);
+    const created = await layer.data.createWaterEntry(input);
+    await layer.data.updateWaterEntry(input.id, { operationId: uuid(), expectedVersion: created.value.version, amountMl: 350 });
+    expect((await layer.data.listWaterEntries({})).items[0]!.amountMl).toBe(350);
+    await layer.data.deleteWaterEntry(input.id, { operationId: uuid(), expectedVersion: created.value.version });
+    expect((await layer.data.listWaterEntries({})).items).toHaveLength(0);
+    expect(layer.sync.getStatus().pendingCount).toBe(3);
+    server.online = true;
+    await layer.sync.syncNow();
+    expect(server.operationCalls.flat().map((o) => o.type)).toEqual(['water.create', 'water.update', 'water.delete']);
+    expect((server.operationCalls[1]![0]!.payload as { expectedVersion: number }).expectedVersion).toBe(1);
+    expect((server.operationCalls[2]![0]!.payload as { expectedVersion: number }).expectedVersion).toBe(2);
+    expect(server.water.size).toBe(0);
+    expect(layer.sync.getStatus()).toMatchObject({ pendingCount: 0, conflictCount: 0, errorCount: 0 });
+  });
+
+  it('undo of a quick-add not yet synced leaves no stray entry on the server', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    const input = waterInput(300);
+    const created = await layer.data.createWaterEntry(input);
+    // "Desfazer" right after the quick add
+    const undo = await layer.data.deleteWaterEntry(input.id, { operationId: uuid(), expectedVersion: created.value.version });
+    expect(undo.persistence).toBe('local');
+    expect((await layer.data.listWaterEntries({})).items).toHaveLength(0);
+    expect((await layer.data.getHydrationSummary('2026-10-18', '2026-10-18')).days[0]!.totalMl).toBeNull();
+    server.online = true;
+    await layer.sync.syncNow();
+    // the engine sends create then delete, in order, rebased — net effect: nothing on the server
+    expect(server.operationCalls.flat().map((o) => o.type)).toEqual(['water.create', 'water.delete']);
+    expect(server.water.size).toBe(0);
+    expect(layer.sync.getStatus()).toMatchObject({ pendingCount: 0, errorCount: 0, conflictCount: 0 });
+    // and the tombstone pulled afterwards does not resurrect anything locally
+    expect((await layer.data.listWaterEntries({})).items).toHaveLength(0);
+  });
+
+  it('validation errors are reported immediately (not queued)', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    await expect(layer.data.createWaterEntry({ ...waterInput(), amountMl: 0 })).rejects.toMatchObject({ status: 422 });
+    await expect(layer.data.createWaterEntry({ ...waterInput(), amountMl: 12.5 })).rejects.toMatchObject({ status: 422 });
+    expect(layer.sync.getStatus().pendingCount).toBe(0);
+  });
+
+  it('server errors on water stay visible in the sync center', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    const input = waterInput();
+    await layer.data.createWaterEntry(input);
+    server.online = true;
+    server.forceStatus = 422;
+    await layer.sync.syncNow();
+    expect(layer.sync.getStatus()).toMatchObject({ pendingCount: 0, errorCount: 1 });
+    const [p] = await layer.sync.listProblemOperations();
+    expect(p).toMatchObject({ state: 'error', type: 'water.create', operationId: input.operationId });
+    expect(OPERATION_LABELS[p!.type]).toBe('Novo registro de água');
+  });
+
+  describe('409 VERSION_CONFLICT on water', () => {
+    async function conflicted() {
+      const server = new FakeServer();
+      const base = waterInput(250, '2026-10-18T12:00:00.000Z');
+      server.upsertWater({ id: base.id, consumedAt: base.consumedAt, timezone: base.timezone, amountMl: 250, notes: null, version: 1, createdAt: base.consumedAt, updatedAt: base.consumedAt });
+      const ctx = await enabledLayer(server);
+      server.upsertWater({ ...server.water.get(base.id)!, amountMl: 500, version: 2 }); // other device
+      server.online = false;
+      const myEdit = { operationId: uuid(), expectedVersion: 1, amountMl: 300 };
+      await ctx.layer.data.updateWaterEntry(base.id, myEdit);
+      server.online = true;
+      await ctx.layer.sync.syncNow();
+      return { ...ctx, id: base.id, myEdit };
+    }
+
+    it('exposes local and remote with pt-BR labels; never overwrites silently', async () => {
+      const { layer, server, id, myEdit } = await conflicted();
+      expect(server.water.get(id)!.amountMl).toBe(500);
+      expect(layer.sync.getStatus().conflictCount).toBe(1);
+      const [p] = await layer.sync.listProblemOperations();
+      expect(p).toMatchObject({ state: 'conflict', type: 'water.update', operationId: myEdit.operationId });
+      expect((p!.localPayload as WaterEntry).amountMl).toBe(300);
+      expect((p!.remote as WaterEntry).amountMl).toBe(500);
+      expect(FIELD_LABELS.amountMl).toBe('Quantidade (ml)');
+      expect(FIELD_LABELS.consumedAt).toBe('Horário');
+      expect(formatField('amountMl', 1500)).toBe('1.500 ml');
+      expect(OPERATION_LABELS['water.update']).toBe('Edição de água');
+    });
+
+    it('"Manter versão do servidor" applies the remote entry', async () => {
+      const { layer, server, id, myEdit } = await conflicted();
+      await layer.sync.resolveKeepRemote(myEdit.operationId);
+      expect((await layer.data.listWaterEntries({})).items[0]).toMatchObject({ id, amountMl: 500 });
+      expect(layer.sync.getStatus().conflictCount).toBe(0);
+      expect(server.water.get(id)!.amountMl).toBe(500);
+    });
+
+    it('"Reaplicar minha edição" re-sends on top of the server version', async () => {
+      const { layer, server, id, myEdit } = await conflicted();
+      await layer.sync.resolveReapplyLocal(myEdit.operationId);
+      await layer.sync.syncNow();
+      expect(server.water.get(id)).toMatchObject({ amountMl: 300, version: 3 });
+      expect(layer.sync.getStatus()).toMatchObject({ conflictCount: 0, pendingCount: 0 });
+      expect((await layer.data.listWaterEntries({})).items[0]!.amountMl).toBe(300);
+    });
+  });
+
+  it('remote tombstones remove the local water entry and workout; unknown entities are ignored', async () => {
+    const server = new FakeServer();
+    const w = waterInput(200);
+    server.upsertWater({ id: w.id, consumedAt: w.consumedAt, timezone: w.timezone, amountMl: 200, notes: null, version: 1, createdAt: w.consumedAt, updatedAt: w.consumedAt });
+    const run = workout('Running', '2026-10-18T10:00:00.000Z', '2026-10-18');
+    server.receiveWorkout(run);
+    const { layer } = await enabledLayer(server);
+    expect((await layer.data.listWaterEntries({})).items).toHaveLength(1);
+    expect((await layer.data.listWorkouts({})).items).toHaveLength(1);
+    server.deleteWater(w.id);
+    server.deleteWorkout(run.id);
+    server.unknownChange();
+    await layer.sync.syncNow();
+    expect((await layer.data.listWaterEntries({})).items).toHaveLength(0);
+    expect((await layer.data.listWorkouts({})).items).toHaveLength(0);
+    server.online = false;
+    await expect(layer.data.getWorkout(run.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('hydration summary offline groups by the profile tz (23:59 / 00:01) and distinguishes absence', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    await layer.data.createWaterEntry(waterInput(200, '2026-10-18T02:59:00.000Z')); // 17/10 23:59 BRT
+    await layer.data.createWaterEntry(waterInput(300, '2026-10-18T03:01:00.000Z')); // 18/10 00:01 BRT
+    const s = await layer.data.getHydrationSummary('2026-10-16', '2026-10-18');
+    expect(s.timezone).toBe('America/Sao_Paulo');
+    expect(s.days.map((d) => d.totalMl)).toEqual([null, 200, 300]);
+    expect(s.averageMlOnRecordedDays).toBe(250);
+    expect(await layer.data.getHydrationGoal()).toBeNull();
+  });
+});
+
+describe('hydration/activity goals and activity reads', () => {
+  it('goal mutations are online only; activity never creates queued operations', async () => {
+    const { server, layer } = await enabledLayer();
+    server.online = false;
+    await expect(layer.data.putHydrationGoal({ operationId: uuid(), dailyTargetMl: 2000 })).rejects.toBeInstanceOf(OfflineError);
+    await expect(layer.data.deleteHydrationGoal()).rejects.toBeInstanceOf(OfflineError);
+    await expect(layer.data.putActivityGoal({ operationId: uuid(), dailyStepsTarget: 8000 })).rejects.toBeInstanceOf(OfflineError);
+    await expect(layer.data.deleteActivityGoal()).rejects.toBeInstanceOf(OfflineError);
+    await layer.data.getActivityToday();
+    await layer.data.getStepsSummary('2026-10-01', '2026-10-18');
+    await layer.data.listWorkouts({});
+    expect(layer.sync.getStatus().pendingCount).toBe(0);
+    expect(server.httpCalls).toEqual([]);
+  });
+
+  it('online goal mutation is mirrored into the local replica', async () => {
+    const { server, layer } = await enabledLayer();
+    await layer.data.putHydrationGoal({ operationId: uuid(), dailyTargetMl: 2000 });
+    server.online = false;
+    expect(await layer.data.getHydrationGoal()).toMatchObject({ dailyTargetMl: 2000 });
+    expect((await layer.data.getHydrationSummary('2026-10-18', '2026-10-18')).goal).toMatchObject({ dailyTargetMl: 2000 });
+  });
+
+  it('steps/workouts are served offline up to the last sync: partial today, no data vs zero, lastReceivedAt', async () => {
+    const server = new FakeServer();
+    server.receiveSteps(steps('2026-10-16', 0, '2026-10-17T01:00:00.000Z'));
+    server.receiveSteps(steps('2026-10-18', 4200, '2026-10-18T13:00:00.000Z'));
+    server.activityGoal = { dailyStepsTarget: 8000, version: 1, updatedAt: '2026-10-01T00:00:00.000Z' };
+    server.receiveWorkout(workout('Running', '2026-10-18T10:00:00.000Z', '2026-10-18', 1800, '2026-10-18T13:30:00.000Z'));
+    server.receiveWorkout(workout('Walking', '2026-10-17T10:00:00.000Z', '2026-10-17', 900, '2026-10-17T13:30:00.000Z'));
+    const now = () => new Date('2026-10-18T15:00:00.000Z'); // 12:00 in São Paulo
+    const { layer } = await enabledLayer(server, memoryStorage(), now);
+    // newer data arrives on the server after the last sync…
+    server.receiveSteps(steps('2026-10-17', 9999));
+    server.online = false;
+    const s = await layer.data.getStepsSummary('2026-10-15', '2026-10-18');
+    expect(s.days.map((d) => [d.count, d.partial])).toEqual([[null, false], [0, false], [null, false], [4200, true]]);
+    expect(s.averageOnDaysWithData).toBe(2100);
+    expect(s.goal).toMatchObject({ dailyStepsTarget: 8000 });
+    expect(s.lastReceivedAt).toBe('2026-10-18T13:30:00.000Z');
+    const today = await layer.data.getActivityToday();
+    expect(today).toMatchObject({ date: '2026-10-18', steps: { count: 4200, partial: true }, workoutCount: 1, workoutSeconds: 1800 });
+    const dash = await layer.data.getDashboard();
+    expect(dash.activity).toEqual(today);
+    expect(dash.hydration).toEqual({ totalMl: null, entryCount: 0, goal: null, lastEntryAt: null });
+    const page = await layer.data.listWorkouts({ name: 'Running' });
+    expect(page.items).toHaveLength(1);
+    expect(page.availableNames).toEqual(['Running', 'Walking']);
+    expect(await layer.data.getWorkout(page.items[0]!.id)).toMatchObject({ name: 'Running' });
+    // …and appears after the next sync (upsert via /sync/changes)
+    server.online = true;
+    await layer.sync.syncNow();
+    expect((await layer.data.getStepsSummary('2026-10-17', '2026-10-17')).days[0]!.count).toBe(9999);
+  });
+
+  it('dashboard composes today\'s water in the profile tz', async () => {
+    const now = () => new Date('2026-10-18T15:00:00.000Z');
+    const { server, layer } = await enabledLayer(new FakeServer(), memoryStorage(), now);
+    server.online = false;
+    await layer.data.createWaterEntry(waterInput(200, '2026-10-18T02:59:00.000Z')); // yesterday locally
+    await layer.data.createWaterEntry(waterInput(300, '2026-10-18T03:01:00.000Z'));
+    await layer.data.createWaterEntry(waterInput(500, '2026-10-18T14:00:00.000Z'));
+    const d = await layer.data.getDashboard();
+    expect(d.hydration).toEqual({ totalMl: 800, entryCount: 2, goal: null, lastEntryAt: '2026-10-18T14:00:00.000Z' });
+  });
+});
+
+describe('passthrough (offline disabled) delegates every new method to HTTP', () => {
+  it('water, hydration and activity', async () => {
+    const server = new FakeServer();
+    server.receiveWorkout(workout('Running', '2026-10-18T10:00:00.000Z', '2026-10-18'));
+    const layer = makeLayer(server);
+    const input = waterInput(300);
+    const created = await layer.data.createWaterEntry(input);
+    expect(created.persistence).toBe('server');
+    const updated = await layer.data.updateWaterEntry(input.id, { operationId: uuid(), expectedVersion: 1, amountMl: 400 });
+    expect(updated).toMatchObject({ persistence: 'server', value: { amountMl: 400 } });
+    expect((await layer.data.deleteWaterEntry(input.id, { operationId: uuid(), expectedVersion: 2 })).persistence).toBe('server');
+    await layer.data.listWaterEntries({});
+    await layer.data.getHydrationSummary('2026-10-01', '2026-10-18');
+    await layer.data.getHydrationGoal();
+    await layer.data.putHydrationGoal({ operationId: uuid(), dailyTargetMl: 2000 });
+    await layer.data.deleteHydrationGoal();
+    await layer.data.getActivityToday('2026-10-18');
+    await layer.data.getStepsSummary('2026-10-01', '2026-10-18');
+    await layer.data.listWorkouts({});
+    await layer.data.getWorkout([...server.workouts.keys()][0]!);
+    await layer.data.getActivityGoal();
+    await layer.data.putActivityGoal({ operationId: uuid(), dailyStepsTarget: 8000 });
+    await layer.data.deleteActivityGoal();
+    expect(server.httpCalls).toEqual([
+      'listWaterEntries', 'getHydrationSummary', 'getHydrationGoal', 'putHydrationGoal', 'deleteHydrationGoal',
+      'getActivityToday', 'getStepsSummary', 'listWorkouts', 'getWorkout', 'getActivityGoal', 'putActivityGoal', 'deleteActivityGoal',
+    ]);
+    expect(server.operationCalls).toHaveLength(0);
+    expect(await Dexie.exists(dbName(U1))).toBe(false);
+  });
+});
+
+describe('account safety with water/activity', () => {
+  it('logout wipes water and activity together with the account DB', async () => {
+    const server = new FakeServer();
+    server.receiveSteps(steps('2026-10-18', 1234));
+    server.receiveWorkout(workout('Running', '2026-10-18T10:00:00.000Z', '2026-10-18'));
+    const { layer } = await enabledLayer(server);
+    server.online = false;
+    await layer.data.createWaterEntry(waterInput(300));
+    server.online = true;
+    layer.sync.setSignOutHandler(async () => 'sync');
+    await layer.auth.signOut();
+    expect(server.water.size).toBe(1); // synced first
+    expect(await Dexie.exists(dbName(U1))).toBe(false);
+    const db = rawDb(U1); // a fresh DB has nothing of the previous session
+    expect(await db.waterEntries.count()).toBe(0);
+    expect(await db.dailySteps.count()).toBe(0);
+    expect(await db.workouts.count()).toBe(0);
+    db.close();
+    await Dexie.delete(dbName(U1));
+  });
+
+  it('switching account never exposes the previous account water/activity', async () => {
+    const server = new FakeServer();
+    server.receiveSteps(steps('2026-10-18', 1234));
+    const { layer } = await enabledLayer(server);
+    await layer.data.createWaterEntry(waterInput(300));
+    await layer.auth.signIn({ email: '2222@example.com', password: 'x' });
+    expect(await Dexie.exists(dbName(U1))).toBe(false);
+    server.httpCalls = [];
+    await layer.data.getStepsSummary('2026-10-18', '2026-10-18');
+    await layer.data.listWaterEntries({});
+    expect(server.httpCalls).toEqual(['getStepsSummary', 'listWaterEntries']); // from the server, not U1's replica
+  });
+
+  it('clearLocalData wipes the new tables', async () => {
+    const server = new FakeServer();
+    server.receiveWorkout(workout('Running', '2026-10-18T10:00:00.000Z', '2026-10-18'));
+    const { layer } = await enabledLayer(server);
+    await layer.sync.clearLocalData();
+    expect(await Dexie.exists(dbName(U1))).toBe(false);
   });
 });
 

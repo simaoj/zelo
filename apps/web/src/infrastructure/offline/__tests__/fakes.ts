@@ -7,6 +7,11 @@ import type {
   SyncOperationResult,
   WeightEntry,
   IntakeRecord,
+  WaterEntry,
+  HydrationGoal,
+  DailySteps,
+  ActivityGoal,
+  Workout,
 } from '@zelo/contracts';
 import { DataError, OfflineError, type AuthPort, type Mutation, type ZeloDataSource } from '@/shared/data/ports';
 import type { SyncApi } from '../api';
@@ -40,6 +45,13 @@ export class FakeServer {
   sessionUser: string | null = U1;
   weights = new Map<string, WeightEntry>();
   occurrences = new Map<string, Occurrence>();
+  water = new Map<string, WaterEntry>();
+  hydrationGoal: HydrationGoal | null = null;
+  steps = new Map<string, DailySteps>();
+  workouts = new Map<string, Workout>();
+  activityGoal: ActivityGoal | null = null;
+  /** calls made to the (online-only) HTTP reads/writes of the new modules */
+  httpCalls: string[] = [];
   log: Array<{ seq: number; change: SyncChange }> = [];
   seq = 0;
   idem = new Map<string, { payload: string; result: SyncOperationResult }>();
@@ -76,6 +88,32 @@ export class FakeServer {
   deleteWeight(id: string) {
     this.weights.delete(id);
     this.bump({ op: 'delete', entity: 'weightEntry', id });
+  }
+
+  upsertWater(w: WaterEntry) {
+    this.water.set(w.id, w);
+    this.bump({ op: 'upsert', entity: 'waterEntry', id: w.id, data: w });
+  }
+  deleteWater(id: string) {
+    this.water.delete(id);
+    this.bump({ op: 'delete', entity: 'waterEntry', id });
+  }
+  /** activity "received from the iPhone" (server side import) */
+  receiveSteps(s: DailySteps) {
+    this.steps.set(s.id, s);
+    this.bump({ op: 'upsert', entity: 'dailySteps', id: s.id, data: s });
+  }
+  receiveWorkout(w: Workout) {
+    this.workouts.set(w.id, w);
+    this.bump({ op: 'upsert', entity: 'workout', id: w.id, data: w });
+  }
+  deleteWorkout(id: string) {
+    this.workouts.delete(id);
+    this.bump({ op: 'delete', entity: 'workout', id });
+  }
+  /** a change for an entity this client does not know (newer server) */
+  unknownChange() {
+    this.bump({ op: 'upsert', entity: 'somethingNew' as never, id: 'x', data: { id: 'x' } });
   }
 
   process(op: SyncOperation): SyncOperationResult {
@@ -158,6 +196,41 @@ export class FakeServer {
         this.bump({ op: 'upsert', entity: 'intakeRecord', id: rec.id, data: rec });
         return ok(rec);
       }
+      case 'water.create': {
+        if (this.water.has(id)) return { operationId: p.operationId, status: 409, error: err(409, 'IDEMPOTENCY_CONFLICT') };
+        const w: WaterEntry = {
+          id,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+          consumedAt: p.consumedAt as string,
+          timezone: p.timezone as string,
+          amountMl: p.amountMl as number,
+          notes: (p.notes as string | null | undefined) ?? null,
+        };
+        this.upsertWater(w);
+        return ok(w, 201);
+      }
+      case 'water.update': {
+        const cur = this.water.get(id);
+        if (!cur) return { operationId: p.operationId, status: 404, error: err(404, 'NOT_FOUND') };
+        if (cur.version !== p.expectedVersion)
+          return { operationId: p.operationId, status: 409, error: err(409, 'VERSION_CONFLICT', { current: cur }) };
+        const { operationId: _o, expectedVersion: _e, ...fields } = p;
+        void _o;
+        void _e;
+        const next = { ...cur, ...fields, version: cur.version + 1, updatedAt: now } as WaterEntry;
+        this.upsertWater(next);
+        return ok(next);
+      }
+      case 'water.delete': {
+        const cur = this.water.get(id);
+        if (!cur) return { operationId: p.operationId, status: 404, error: err(404, 'NOT_FOUND') };
+        if (cur.version !== p.expectedVersion)
+          return { operationId: p.operationId, status: 409, error: err(409, 'VERSION_CONFLICT', { current: cur }) };
+        this.deleteWater(id);
+        return ok(undefined, 204);
+      }
       default:
         return { operationId: p.operationId, status: 400, error: err(400, 'VALIDATION_ERROR') };
     }
@@ -181,6 +254,11 @@ export class FakeServer {
         routineItems: [],
         occurrences: [...this.occurrences.values()],
         intakeRecords: [],
+        waterEntries: [...this.water.values()],
+        hydrationGoal: this.hydrationGoal,
+        dailySteps: [...this.steps.values()],
+        activityGoal: this.activityGoal,
+        workouts: [...this.workouts.values()],
       };
     },
     changes: async (cursor) => {
@@ -277,6 +355,75 @@ export class FakeServer {
       listIntakes: notUsed,
       updateIntake: notUsed,
       deleteIntake: notUsed,
+      listWaterEntries: async () => {
+        this.guard();
+        this.httpCalls.push('listWaterEntries');
+        return { items: [...this.water.values()], nextCursor: null };
+      },
+      createWaterEntry: (input) => call({ type: 'water.create', entityId: input.id, payload: input }),
+      updateWaterEntry: (id, input) => call({ type: 'water.update', entityId: id, payload: input }),
+      deleteWaterEntry: (id, input) => call({ type: 'water.delete', entityId: id, payload: input }),
+      getHydrationSummary: async (from, to) => {
+        this.guard();
+        this.httpCalls.push('getHydrationSummary');
+        return { timezone: 'America/Sao_Paulo', from, to, days: [], goal: this.hydrationGoal, averageMlOnRecordedDays: null };
+      },
+      getHydrationGoal: async () => {
+        this.guard();
+        this.httpCalls.push('getHydrationGoal');
+        return this.hydrationGoal;
+      },
+      putHydrationGoal: async (input) => {
+        this.guard();
+        this.httpCalls.push('putHydrationGoal');
+        this.hydrationGoal = { dailyTargetMl: input.dailyTargetMl, version: (this.hydrationGoal?.version ?? 0) + 1, updatedAt: new Date().toISOString() };
+        this.bump({ op: 'upsert', entity: 'hydrationGoal', id: 'current', data: this.hydrationGoal });
+        return this.hydrationGoal;
+      },
+      deleteHydrationGoal: async () => {
+        this.guard();
+        this.httpCalls.push('deleteHydrationGoal');
+        this.hydrationGoal = null;
+      },
+      getActivityToday: async (date) => {
+        this.guard();
+        this.httpCalls.push('getActivityToday');
+        const d = date ?? '2026-10-18';
+        return { date: d, steps: { date: d, count: null, partial: true, receivedAt: null }, stepsGoal: null, workoutCount: 0, workoutSeconds: 0, lastReceivedAt: null };
+      },
+      getStepsSummary: async (from, to) => {
+        this.guard();
+        this.httpCalls.push('getStepsSummary');
+        return { from, to, days: [], goal: null, averageOnDaysWithData: null, lastReceivedAt: null };
+      },
+      listWorkouts: async () => {
+        this.guard();
+        this.httpCalls.push('listWorkouts');
+        return { items: [...this.workouts.values()], nextCursor: null, availableNames: [] };
+      },
+      getWorkout: async (id) => {
+        this.guard();
+        this.httpCalls.push('getWorkout');
+        const w = this.workouts.get(id);
+        if (!w) throw new DataError(404, err(404, 'NOT_FOUND'));
+        return w;
+      },
+      getActivityGoal: async () => {
+        this.guard();
+        this.httpCalls.push('getActivityGoal');
+        return this.activityGoal;
+      },
+      putActivityGoal: async (input) => {
+        this.guard();
+        this.httpCalls.push('putActivityGoal');
+        this.activityGoal = { dailyStepsTarget: input.dailyStepsTarget, version: 1, updatedAt: new Date().toISOString() };
+        return this.activityGoal;
+      },
+      deleteActivityGoal: async () => {
+        this.guard();
+        this.httpCalls.push('deleteActivityGoal');
+        this.activityGoal = null;
+      },
       subscribe: () => () => undefined,
     };
   }
@@ -288,4 +435,37 @@ export const weightInput = (weightKg = '82.35', measuredAt = '2026-10-10T10:00:0
   measuredAt,
   timezone: 'America/Sao_Paulo',
   weightKg,
+});
+
+export const waterInput = (amountMl = 300, consumedAt = '2026-10-18T12:00:00.000Z') => ({
+  operationId: uuid(),
+  id: uuid(),
+  consumedAt,
+  timezone: 'America/Sao_Paulo',
+  amountMl,
+});
+
+export const steps = (localDate: string, count: number, receivedAt = `${localDate}T23:00:00.000Z`): DailySteps => ({
+  id: uuid(),
+  provider: 'health-auto-export',
+  localDate,
+  count,
+  offsetMinutes: -180,
+  receivedAt,
+  createdAt: receivedAt,
+});
+
+export const workout = (name: string, startedAt: string, localDate: string, durationSeconds = 1800, receivedAt = '2026-10-18T12:00:00.000Z'): Workout => ({
+  id: uuid(),
+  provider: 'health-auto-export',
+  name,
+  startedAt,
+  endedAt: new Date(Date.parse(startedAt) + durationSeconds * 1000).toISOString(),
+  startOffsetMinutes: -180,
+  localDate,
+  durationSeconds,
+  distanceMeters: null,
+  activeEnergyKcal: null,
+  receivedAt,
+  createdAt: receivedAt,
 });

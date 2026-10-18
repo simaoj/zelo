@@ -5,9 +5,11 @@
  *    HTTP and nothing personal is stored locally.
  *  - Enabled → per-account Dexie DB `zelo-<userId>` replicated via /sync/bootstrap + /sync/changes.
  *    Reads are served from IndexedDB. Allowed mutations (weight/measurement/BP CRUD, occurrence
- *    intake put/undo, ad-hoc intake) go straight to the server when online and nothing is queued
+ *    intake put/undo, ad-hoc intake, water entry CRUD) go straight to the server when online and nothing is queued
  *    for that entity; otherwise they are written locally + queued in ONE transaction
  *    ({persistence:'local'}). Everything else requires network (OfflineError).
+ *  - Activity (steps/workouts received from Health Auto Export) is a READ-ONLY replica: served
+ *    from IndexedDB up to the last sync, never queued, never fetched from the iPhone.
  *  - Queue is pushed in order (one op per entity per round, chained ops rebased on the
  *    server-confirmed version), confirmed only after the server answers.
  */
@@ -34,6 +36,9 @@ import type {
   UpdateMeasurementRequest,
   UpdateWeightRequest,
   WeightGoal,
+  CreateWaterEntryRequest,
+  UpdateWaterEntryRequest,
+  WaterEntry,
 } from '@zelo/contracts';
 import {
   DataError,
@@ -48,7 +53,18 @@ import {
 import { createFetchSyncApi, type SyncApi } from './api';
 import { ZeloDb, deleteUserDb, type QueuedOperation } from './db';
 import { DeviceFlags, type KeyValueStorage } from './flags';
-import { composeDashboard, localDateIn, pageLocal, withDeltas, withDerivedState } from './local-queries';
+import {
+  activityForDay,
+  composeDashboard,
+  localDateIn,
+  pageLocal,
+  pageWater,
+  pageWorkouts,
+  summarizeHydration,
+  summarizeSteps,
+  withDeltas,
+  withDerivedState,
+} from './local-queries';
 import {
   UNSYNCED_STATES,
   applyBootstrap,
@@ -59,6 +75,7 @@ import {
   currentLocalVersion,
   dataTables,
   entityHasUnsynced,
+  localError,
   unsyncedOps,
   validateOperation,
 } from './store';
@@ -122,6 +139,9 @@ const ALLOWED_OFFLINE: ReadonlySet<SyncOperationType> = new Set<SyncOperationTyp
   'occurrence.intake.put',
   'occurrence.intake.delete',
   'intake.create',
+  'water.create',
+  'water.update',
+  'water.delete',
 ]);
 
 const BATCH_MAX = 100;
@@ -914,12 +934,24 @@ export function createOfflineDataSource(rt: OfflineRuntime): ZeloDataSource {
     return p;
   }
 
-  const strip = (g: (WeightGoal & { key?: string }) | undefined): WeightGoal | null => {
+  const strip = <G extends object>(g: (G & { key?: string }) | undefined): G | null => {
     if (!g) return null;
     const { key: _key, ...rest } = g;
     void _key;
-    return rest;
+    return rest as G;
   };
+
+  async function activityToday(db: ZeloDb, date?: string) {
+    const profile = await profileOf(db);
+    const today = localDateIn(profile.timezone, rt.localNow());
+    return activityForDay({
+      date: date ?? today,
+      today,
+      steps: await db.dailySteps.toArray(),
+      workouts: await db.workouts.toArray(),
+      goal: strip(await db.activityGoal.get('current')),
+    });
+  }
 
   return {
     getProfile: () => local(profileOf, () => http.getProfile()),
@@ -936,6 +968,11 @@ export function createOfflineDataSource(rt: OfflineRuntime): ZeloDataSource {
             bloodPressure: await db.bloodPressureEntries.toArray(),
             measurements: await db.measurementSessions.toArray(),
             occurrences: await occurrencesFor(db, d),
+            water: await db.waterEntries.toArray(),
+            hydrationGoal: strip(await db.hydrationGoal.get('current')),
+            steps: await db.dailySteps.toArray(),
+            workouts: await db.workouts.toArray(),
+            activityGoal: strip(await db.activityGoal.get('current')),
             now: rt.localNow(),
           });
         },
@@ -946,7 +983,7 @@ export function createOfflineDataSource(rt: OfflineRuntime): ZeloDataSource {
     createWeight: (input: CreateWeightRequest) => rt.mutate('weight.create', input.id, input, () => http.createWeight(input)),
     updateWeight: (id, input: UpdateWeightRequest) => rt.mutate('weight.update', id, input, () => http.updateWeight(id, input)),
     deleteWeight: (id, input: DeleteRequest) => rt.mutate('weight.delete', id, input, () => http.deleteWeight(id, input)),
-    getWeightGoal: () => local(async (db) => strip(await db.weightGoal.get('current')), () => http.getWeightGoal()),
+    getWeightGoal: () => local(async (db) => strip<WeightGoal>(await db.weightGoal.get('current')), () => http.getWeightGoal()),
     putWeightGoal: (input) => onlineOnly(() => http.putWeightGoal(input), (db, g) => db.weightGoal.put({ ...g, key: 'current' })),
     deleteWeightGoal: () => onlineOnly(() => http.deleteWeightGoal(), (db) => db.weightGoal.clear()),
 
@@ -1006,6 +1043,58 @@ export function createOfflineDataSource(rt: OfflineRuntime): ZeloDataSource {
           }
         },
       ),
+
+    // ---- hydration: entries through the SAME queue as weights; goal online only ----
+    listWaterEntries: (q) => local(async (db) => pageWater(await db.waterEntries.toArray(), q), () => http.listWaterEntries(q)),
+    createWaterEntry: (input: CreateWaterEntryRequest) => rt.mutate<WaterEntry>('water.create', input.id, input, () => http.createWaterEntry(input)),
+    updateWaterEntry: (id, input: UpdateWaterEntryRequest) => rt.mutate<WaterEntry>('water.update', id, input, () => http.updateWaterEntry(id, input)),
+    deleteWaterEntry: (id, input) => rt.mutate<null>('water.delete', id, input, () => http.deleteWaterEntry(id, input)),
+    getHydrationSummary: (from, to) =>
+      local(
+        async (db) =>
+          summarizeHydration({
+            from,
+            to,
+            timezone: (await profileOf(db)).timezone,
+            entries: await db.waterEntries.toArray(),
+            goal: strip(await db.hydrationGoal.get('current')),
+          }),
+        () => http.getHydrationSummary(from, to),
+      ),
+    getHydrationGoal: () => local(async (db) => strip(await db.hydrationGoal.get('current')), () => http.getHydrationGoal()),
+    putHydrationGoal: (input) => onlineOnly(() => http.putHydrationGoal(input), (db, g) => db.hydrationGoal.put({ ...g, key: 'current' })),
+    deleteHydrationGoal: () => onlineOnly(() => http.deleteHydrationGoal(), (db) => db.hydrationGoal.clear()),
+
+    // ---- activity: read-only replica (up to the last sync); goal online only ----
+    getActivityToday: (date) => local((db) => activityToday(db, date), () => http.getActivityToday(date)),
+    getStepsSummary: (from, to) =>
+      local(
+        async (db) =>
+          summarizeSteps({
+            from,
+            to,
+            today: localDateIn((await profileOf(db)).timezone, rt.localNow()),
+            steps: await db.dailySteps.toArray(),
+            workouts: await db.workouts.toArray(),
+            goal: strip(await db.activityGoal.get('current')),
+          }),
+        () => http.getStepsSummary(from, to),
+      ),
+    listWorkouts: (q) => local(async (db) => pageWorkouts(await db.workouts.toArray(), q), () => http.listWorkouts(q)),
+    getWorkout: (id) =>
+      local(
+        async (db) => {
+          const w = await db.workouts.get(id);
+          if (w) return w;
+          // outside the replicated window (90 days): ask the server when possible
+          if (online()) return http.getWorkout(id);
+          throw localError(404, 'NOT_FOUND', 'Exercício não disponível neste dispositivo.');
+        },
+        () => http.getWorkout(id),
+      ),
+    getActivityGoal: () => local(async (db) => strip(await db.activityGoal.get('current')), () => http.getActivityGoal()),
+    putActivityGoal: (input) => onlineOnly(() => http.putActivityGoal(input), (db, g) => db.activityGoal.put({ ...g, key: 'current' })),
+    deleteActivityGoal: () => onlineOnly(() => http.deleteActivityGoal(), (db) => db.activityGoal.clear()),
 
     subscribe(listener) {
       const a = http.subscribe(listener);

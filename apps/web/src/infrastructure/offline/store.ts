@@ -13,6 +13,9 @@ import {
   type SyncChange,
   type SyncOperationType,
   type WeightEntry,
+  type WaterEntry,
+  type DailySteps,
+  type Workout,
 } from '@zelo/contracts';
 import { DataError, OfflineError } from '@/shared/data/ports';
 import type { Table } from 'dexie';
@@ -31,9 +34,25 @@ export const dataTables = (db: ZeloDb) => [
   db.routineItems,
   db.occurrences,
   db.intakeRecords,
+  db.waterEntries,
+  db.hydrationGoal,
+  db.dailySteps,
+  db.activityGoal,
+  db.workouts,
   db.operations,
   db.meta,
 ];
+
+/** Local table that an operation kind targets (generic CRUD entities + ad-hoc intake). */
+export function tableFor(db: ZeloDb, kind: string): Table<{ id: string; version?: number }, string> {
+  const t =
+    kind === 'weight' ? db.weightEntries
+    : kind === 'measurement' ? db.measurementSessions
+    : kind === 'bloodPressure' ? db.bloodPressureEntries
+    : kind === 'water' ? db.waterEntries
+    : db.intakeRecords;
+  return t as unknown as Table<{ id: string; version?: number }, string>;
+}
 
 export function localError(status: number, code: 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFIRMATION_REQUIRED', message: string, fieldErrors?: Record<string, string[]>) {
   return new DataError(status, { code, message, fieldErrors, correlationId: 'local' });
@@ -77,6 +96,14 @@ export async function applyBootstrap(db: ZeloDb, b: SyncBootstrapResponse, keepI
       db.intakeRecords,
       b.intakeRecords.filter((r) => !(r.occurrenceId && keepIds.has(r.occurrenceId))),
     );
+    await replace(db.waterEntries, b.waterEntries ?? []);
+    await db.hydrationGoal.clear();
+    if (b.hydrationGoal) await db.hydrationGoal.put({ ...b.hydrationGoal, key: 'current' });
+    // activity is read-only (received from the iPhone export): the snapshot simply replaces it
+    await replace(db.dailySteps, b.dailySteps ?? []);
+    await db.activityGoal.clear();
+    if (b.activityGoal) await db.activityGoal.put({ ...b.activityGoal, key: 'current' });
+    await replace(db.workouts, b.workouts ?? []);
     await recomputeDeltas(db);
     await db.meta.put({ key: 'cursor', value: b.cursor });
   });
@@ -115,6 +142,26 @@ export async function applyChange(db: ZeloDb, c: SyncChange, pendingIds: Set<str
     case 'occurrence':
       if (del) await db.occurrences.delete(c.id);
       else await db.occurrences.put(data as Occurrence);
+      return;
+    case 'waterEntry':
+      if (del) await db.waterEntries.delete(c.id);
+      else await db.waterEntries.put(data as WaterEntry);
+      return;
+    case 'hydrationGoal':
+      if (del) await db.hydrationGoal.clear();
+      else await db.hydrationGoal.put({ ...(data as object), key: 'current' } as never);
+      return;
+    case 'dailySteps':
+      if (del) await db.dailySteps.delete(c.id);
+      else await db.dailySteps.put(data as DailySteps);
+      return;
+    case 'activityGoal':
+      if (del) await db.activityGoal.clear();
+      else await db.activityGoal.put({ ...(data as object), key: 'current' } as never);
+      return;
+    case 'workout':
+      if (del) await db.workouts.delete(c.id);
+      else await db.workouts.put(data as Workout);
       return;
     case 'intakeRecord': {
       if (del) {
@@ -180,8 +227,18 @@ export async function applyServerResult(db: ZeloDb, type: SyncOperationType, ent
       }
       return;
     }
+    case 'water.create':
+    case 'water.update':
+      await db.waterEntries.put(body as WaterEntry);
+      return;
+    case 'water.delete':
+      await db.waterEntries.delete(entityId);
+      return;
     case 'intake.create':
       await db.intakeRecords.put(body as IntakeRecord);
+      return;
+    default:
+      // unknown operation type (newer server/client): nothing to mirror locally
       return;
   }
 }
@@ -198,9 +255,9 @@ export async function applyRemoteSnapshot(db: ZeloDb, op: QueuedOperation) {
     await db.occurrences.put({ ...occ, intake: rec });
     return;
   }
-  const kind = op.type.split('.')[0];
-  const table = kind === 'weight' ? db.weightEntries : kind === 'measurement' ? db.measurementSessions : kind === 'bloodPressure' ? db.bloodPressureEntries : db.intakeRecords;
-  if (remote && typeof remote === 'object' && 'id' in remote) await (table as typeof db.weightEntries).put(remote as never);
+  const kind = op.type.split('.')[0]!;
+  const table = tableFor(db, kind);
+  if (remote && typeof remote === 'object' && 'id' in remote) await table.put(remote as never);
   else await table.delete(op.entityId);
   if (kind === 'weight') await recomputeDeltas(db);
 }
@@ -239,11 +296,11 @@ export function validateOperation(type: SyncOperationType, entityId: string, pay
  */
 export async function applyLocalEdit(db: ZeloDb, type: SyncOperationType, entityId: string, payload: Record<string, unknown>, now: Date): Promise<unknown> {
   const ts = now.toISOString();
-  const kind = type.split('.')[0] as 'weight' | 'measurement' | 'bloodPressure' | 'occurrence' | 'intake';
+  const kind = type.split('.')[0] as 'weight' | 'measurement' | 'bloodPressure' | 'water' | 'occurrence' | 'intake';
   const action = type.split('.').pop() as 'create' | 'update' | 'delete' | 'put';
 
-  if (kind === 'weight' || kind === 'measurement' || kind === 'bloodPressure') {
-    const table = (kind === 'weight' ? db.weightEntries : kind === 'measurement' ? db.measurementSessions : db.bloodPressureEntries) as unknown as typeof db.weightEntries;
+  if (kind === 'weight' || kind === 'measurement' || kind === 'bloodPressure' || kind === 'water') {
+    const table = tableFor(db, kind);
     const existing = await table.get(entityId);
     let value: unknown = null;
     if (action === 'create') {
@@ -329,8 +386,6 @@ export async function currentLocalVersion(db: ZeloDb, op: QueuedOperation): Prom
     const occ = await db.occurrences.get(op.entityId);
     return occ?.intake?.version ?? null;
   }
-  const kind = op.type.split('.')[0];
-  const table = kind === 'weight' ? db.weightEntries : kind === 'measurement' ? db.measurementSessions : kind === 'bloodPressure' ? db.bloodPressureEntries : db.intakeRecords;
-  const e = (await (table as typeof db.weightEntries).get(op.entityId)) as { version?: number } | undefined;
+  const e = await tableFor(db, op.type.split('.')[0]!).get(op.entityId);
   return e?.version ?? null;
 }

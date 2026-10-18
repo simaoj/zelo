@@ -15,6 +15,11 @@ import type {
   SyncOperationType,
   WeightEntry,
   WeightGoal,
+  WaterEntry,
+  HydrationGoal,
+  DailySteps,
+  ActivityGoal,
+  Workout,
 } from '@zelo/contracts';
 
 export type OperationState = 'pending' | 'syncing' | 'synced' | 'conflict' | 'error';
@@ -47,6 +52,8 @@ export interface MetaRow {
 }
 
 export type WeightGoalRow = WeightGoal & { key: 'current' };
+export type HydrationGoalRow = HydrationGoal & { key: 'current' };
+export type ActivityGoalRow = ActivityGoal & { key: 'current' };
 
 /** Optional local drafts (forms may persist unsaved input here; preserved across SW updates). */
 export interface DraftRow {
@@ -64,6 +71,12 @@ export class ZeloDb extends Dexie {
   routineItems!: EntityTable<RoutineItem, 'id'>;
   occurrences!: EntityTable<Occurrence, 'id'>;
   intakeRecords!: EntityTable<IntakeRecord, 'id'>;
+  waterEntries!: EntityTable<WaterEntry, 'id'>;
+  hydrationGoal!: Table<HydrationGoalRow, string>;
+  /** read-only replica of activity received from Health Auto Export */
+  dailySteps!: EntityTable<DailySteps, 'id'>;
+  activityGoal!: Table<ActivityGoalRow, string>;
+  workouts!: EntityTable<Workout, 'id'>;
   operations!: Table<QueuedOperation, number>;
   meta!: Table<MetaRow, string>;
   drafts!: Table<DraftRow, string>;
@@ -94,6 +107,21 @@ export class ZeloDb extends Dexie {
           if (op.chained === undefined) op.chained = false;
           if (op.nextAttemptAt === undefined) op.nextAttemptAt = null;
         });
+      });
+    // v3 — water + activity (additive: new tables only; existing rows and the queue untouched).
+    // Tables appear empty until the next bootstrap fills them (forceBootstrap below).
+    this.version(3)
+      .stores({
+        waterEntries: 'id, consumedAt',
+        hydrationGoal: 'key',
+        dailySteps: 'id, localDate',
+        activityGoal: 'key',
+        workouts: 'id, startedAt, localDate, name',
+      })
+      .upgrade(async (tx) => {
+        // an already-bootstrapped DB has no water/activity yet → refetch the snapshot on next sync
+        // (pending operations are kept by applyBootstrap's keepIds).
+        if (await tx.table('meta').get('cursor')) await tx.table('meta').put({ key: 'forceBootstrap', value: true });
       });
   }
 }
