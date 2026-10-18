@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { useResource } from '@/shared/data/hooks';
 import { useTimeZone } from '@/shared/data/session';
@@ -10,9 +11,10 @@ import { ErrorState, SkeletonCard } from '@/shared/ui/States';
 import { CachedDataNote } from './ActivityBits';
 import { PROVIDER_LABEL } from './activityLogic';
 
-export function WorkoutDetailsPage({ id }: { id: string }) {
+export function WorkoutDetailsPage() {
   const tz = useTimeZone();
-  const res = useResource(`workout:${id}`, (ds) => ds.getWorkout(id));
+  const id = useSearchParams().get('id');
+  const res = useResource(id ? `workout:${id}` : null, (ds) => ds.getWorkout(id!));
   const w = res.data;
   return (
     <div className="flex flex-col gap-4">
@@ -21,7 +23,9 @@ export function WorkoutDetailsPage({ id }: { id: string }) {
         Exercícios
       </Link>
       <CachedDataNote tz={tz} />
-      {res.loading && !w ? (
+      {!id ? (
+        <p className="text-sm text-ink-muted">Exercício não encontrado.</p>
+      ) : res.loading && !w ? (
         <SkeletonCard lines={6} />
       ) : res.error && !w ? (
         <ErrorState error={res.error} onRetry={res.reload} />

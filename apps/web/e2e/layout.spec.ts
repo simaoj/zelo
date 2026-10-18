@@ -2,8 +2,9 @@ import { expect, test } from '@playwright/test';
 import { APP_PAGES, PUBLIC_PAGES, signUpViaApi } from './helpers';
 
 const WIDTHS = [320, 390, 768, 1440];
-// whole words only (timezone names like "America/Araguaina" must not match "água")
-const FORBIDDEN = /(?<!\p{L})(refei[çc][ãa]o|refei[çc][õo]es|dieta|calorias?|almo[çc]o|jantar|caf[ée] da manh[ãa]|hidrata[çc][ãa]o|[áa]gua)(?!\p{L})/iu;
+// Water/hydration and "kcal ativas" of received workouts are allowed (increment água/atividade);
+// meals and diet stay forbidden. Whole words only.
+const FORBIDDEN = /(?<!\p{L})(refei[çc][ãa]o|refei[çc][õo]es|dieta|calorias?|almo[çc]o|jantar|caf[ée] da manh[ãa])(?!\p{L})/iu;
 
 test('no horizontal scroll at 320/390/768/1440 and nothing hidden behind the bottom nav', async ({ page }) => {
   await signUpViaApi(page);
@@ -33,7 +34,7 @@ test('no horizontal scroll at 320/390/768/1440 and nothing hidden behind the bot
   }
 });
 
-test('no meal/diet/hydration text on any screen', async ({ page }) => {
+test('no meal/diet text on any screen (water is allowed)', async ({ page }) => {
   await signUpViaApi(page);
   for (const path of [...APP_PAGES, ...PUBLIC_PAGES]) {
     await page.goto(path);

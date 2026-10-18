@@ -8,7 +8,7 @@ export function WorkoutCard({ workout: w, tz }: { workout: Workout; tz: string }
   const name = modalityLabel(w.name);
   return (
     <Link
-      href={`/atividade/exercicios/${w.id}`}
+      href={`/atividade/exercicios/detalhe?id=${encodeURIComponent(w.id)}`}
       className="flex items-center gap-3 rounded-card bg-surface p-3 pl-4 shadow-card hover:bg-wash-peach"
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-wash-sun text-[#6c5e00]">

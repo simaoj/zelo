@@ -11,7 +11,7 @@ import { PageHeader } from '@/shared/ui/Card';
 import { SelectField } from '@/shared/ui/Field';
 import { ErrorState, SkeletonCard } from '@/shared/ui/States';
 import { ChipGroup } from '@/shared/ui/Tabs';
-import { ActivityEmpty, CachedDataNote } from './ActivityBits';
+import { ActivityEmpty, CachedDataNote, ReceivedLine } from './ActivityBits';
 import { WorkoutCard } from './WorkoutCard';
 
 type PeriodFilter = '7' | '30' | '90' | 'all';
@@ -53,6 +53,7 @@ export function WorkoutsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader eyebrow="Movimento" title="Exercícios" description="Exercícios recebidos do Auto Export. Somente leitura." />
       <CachedDataNote tz={tz} />
+      <ReceivedLine lastReceivedAt={activity.data?.lastReceivedAt ?? null} tz={tz} />
       <div className="flex flex-col gap-3 rounded-card bg-surface p-4 shadow-card sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold">Período</span>

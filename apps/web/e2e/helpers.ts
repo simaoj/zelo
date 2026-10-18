@@ -25,5 +25,17 @@ export async function signUpViaApi(page: Page, displayName = 'Teste E2E') {
   return email;
 }
 
-export const APP_PAGES = ['/hoje', '/corpo', '/corpo?aba=medidas', '/pressao', '/rotina', '/rotina?aba=itens', '/configuracoes'];
+export const APP_PAGES = [
+  '/hoje',
+  '/corpo',
+  '/corpo?aba=medidas',
+  '/saude/pressao',
+  '/saude/agua',
+  '/atividade/resumo',
+  '/atividade/passos',
+  '/atividade/exercicios',
+  '/rotina',
+  '/rotina?aba=itens',
+  '/configuracoes',
+];
 export const PUBLIC_PAGES = ['/entrar', '/criar-conta', '/recuperar-acesso'];
