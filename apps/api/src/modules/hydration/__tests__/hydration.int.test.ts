@@ -124,7 +124,7 @@ describe('summary and goal', () => {
     expect((await c.get('/hydration/goal')).json()).toMatchObject({ dailyTargetMl: 2500 });
     expect((await c.del('/hydration/goal', { ...op() })).statusCode).toBe(204);
     expect((await c.get('/hydration/goal')).statusCode).toBe(404);
-    expect((await c.del('/hydration/goal')).statusCode).toBe(404);
+    expect((await c.del('/hydration/goal', op())).statusCode).toBe(404);
     expect((await summary(c, '2026-09-20', '2026-09-20')).goal).toBeNull();
   });
 
