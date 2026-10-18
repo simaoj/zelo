@@ -1,0 +1,149 @@
+# Standalone production stack: never combine with docker-compose.yml.
+name: zelo-production
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '10m', max-file: '3' }
+
+x-api: &api
+  image: zelo-api:${RELEASE_TAG:?Set RELEASE_TAG}
+  build: { context: ., dockerfile: apps/api/Dockerfile }
+  logging: *logging
+  environment: &app-env
+    NODE_ENV: production
+    MONGODB_URI: mongodb://zelo:${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD}@mongo:27017/zelo?replicaSet=rs0&authSource=zelo
+    PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set PUBLIC_APP_URL}
+    COOKIE_SECURE: 'true'
+    SMTP_URL: ${SMTP_URL:?Set SMTP_URL}
+    MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+    VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?Set VAPID_PUBLIC_KEY}
+    VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?Set VAPID_PRIVATE_KEY}
+    VAPID_SUBJECT: ${VAPID_SUBJECT:?Set VAPID_SUBJECT}
+    LOG_LEVEL: info
+  networks: [backend]
+
+services:
+  mongo:
+    image: ${MONGO_IMAGE:-mongo:8.2}
+    restart: unless-stopped
+    logging: *logging
+    # Copy the Compose secret: mongod requires a private, mongodb-owned keyfile.
+    entrypoint: [bash, -ec]
+    command:
+      - |
+        cp /run/secrets/mongo_keyfile /tmp/mongo-keyfile
+        chown mongodb:mongodb /tmp/mongo-keyfile
+        chmod 400 /tmp/mongo-keyfile
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/mongo-keyfile
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}
+    secrets: [mongo_keyfile]
+    volumes: [mongo-data:/data/db]
+    networks: [backend]
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          const a = db.getSiblingDB('admin');
+          a.auth('admin', process.env.MONGO_INITDB_ROOT_PASSWORD);
+          try { rs.status(); } catch (e) {
+            if (e.code !== 94) throw e;
+            rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]});
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1);
+      interval: 5s
+      timeout: 10s
+      start_period: 30s
+      retries: 30
+
+  mongo-init:
+    image: ${MONGO_IMAGE:-mongo:8.2}
+    restart: 'no'
+    logging: *logging
+    environment:
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD}
+    entrypoint: [mongosh, --host, mongo, --quiet, --file, /init.js]
+    volumes: [./infra/production/mongo-init.js:/init.js:ro]
+    networks: [backend]
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  migrate:
+    <<: *api
+    restart: 'no'
+    command: [node, apps/api/dist/bootstrap/migrate.js]
+    depends_on:
+      mongo-init: { condition: service_completed_successfully }
+
+  api:
+    <<: *api
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    <<: *api
+    restart: unless-stopped
+    command: [node, apps/api/dist/bootstrap/worker.js]
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    image: zelo-web:${RELEASE_TAG:?Set RELEASE_TAG}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args: { API_INTERNAL_URL: 'http://api:4000' }
+    restart: unless-stopped
+    logging: *logging
+    networks: [backend, frontend]
+    depends_on:
+      api: { condition: service_healthy }
+
+  proxy:
+    image: ${NGINX_IMAGE:-nginx:stable-alpine}
+    restart: unless-stopped
+    logging: *logging
+    volumes: [./infra/production/nginx.conf:/etc/nginx/conf.d/default.conf:ro]
+    networks: [frontend, backend]
+    depends_on:
+      web: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1/entrar']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    restart: unless-stopped
+    logging: *logging
+    command: [tunnel, --no-autoupdate, run, --token-file, /run/secrets/tunnel_token]
+    secrets: [tunnel_token]
+    networks: [frontend]
+    depends_on:
+      proxy: { condition: service_healthy }
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  mongo-data:
+
+secrets:
+  mongo_keyfile:
+    file: ./infra/production/secrets/mongo-keyfile
+  tunnel_token:
+    file: ./infra/production/secrets/tunnel-token

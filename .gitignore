@@ -12,3 +12,6 @@ apps/web/public/sw.js
 apps/web/public/sw.js.map
 next-env.d.ts
 .next-pwa
+.env.production
+infra/production/secrets/
+backups/

@@ -16,3 +16,5 @@ stitch_*
 /*.pdf
 playwright-report
 test-results
+infra/production/secrets
+backups

@@ -42,6 +42,11 @@ Dados fictícios de demonstração (opcional): `docker compose exec api node app
 
 > **Por que MongoDB 8.2?** O `mongo:8.0` não inicia em kernels Linux ≥ 6.19 (SERVER-121912), comum no Docker Desktop recente.
 
+## Deploy no Proxmox
+
+Para produção com Cloudflare Tunnel, use o [guia de deploy](docs/deploy-proxmox.md) e
+`compose.production.yml`, separado do ambiente local.
+
 ## Desenvolvimento sem Docker para as aplicações
 
 ```bash
