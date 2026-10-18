@@ -94,7 +94,12 @@ export async function buildApp(container: Container): Promise<FastifyInstance> {
           'Erros seguem ApiError {code, message, fieldErrors?, correlationId, current?}.',
       },
       servers: [{ url: '/' }],
-      components: { securitySchemes: { session: { type: 'apiKey', in: 'cookie', name: 'zelo_session' } } },
+      components: {
+        securitySchemes: {
+          session: { type: 'apiKey', in: 'cookie', name: 'zelo_session' },
+          integrationToken: { type: 'http', scheme: 'bearer', description: 'Integration token (POST /imports/health only); created by the admin script' },
+        },
+      },
       security: [{ session: [] }],
     },
     transform: jsonSchemaTransform,

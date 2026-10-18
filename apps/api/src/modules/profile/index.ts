@@ -2,7 +2,7 @@ import type { CoreDeps, ModuleDefinition, SyncReader } from '../../bootstrap/mod
 import type { ProfileReader } from '../../shared/application/cross-module-ports.js';
 import type { TxContext } from '../../shared/application/ports.js';
 import { toProfileDto } from './application/dto.js';
-import { GetProfile, ProvisionProfile, UpdateProfile } from './application/use-cases/profile-use-cases.js';
+import { AddVisibleModules, GetProfile, ProvisionProfile, UpdateProfile } from './application/use-cases/profile-use-cases.js';
 import { MongoProfileRepository } from './adapters/out/mongodb/mongo-profile-repository.js';
 import { profileRoutes } from './adapters/in/http/profile-routes.js';
 
@@ -18,6 +18,7 @@ export function createProfileModule(
   const getProfile = new GetProfile(repo);
   const updateProfile = new UpdateProfile(repo, deps.clock, deps.changeLog);
   const provision = new ProvisionProfile(repo, deps.clock, deps.changeLog);
+  const addVisibleModules = new AddVisibleModules(repo, deps.uow, deps.clock, deps.changeLog);
 
   const profileReader: ProfileReader = {
     async getTimezone(userId) {
@@ -49,6 +50,16 @@ export function createProfileModule(
     httpRoutes: profileRoutes({ getProfile, updateProfile, idempotency: deps.idempotency }),
     syncReaders: [reader],
     ensureIndexes: () => repo.ensureIndexes(),
+    migrations: [
+      {
+        id: '2026-10-18-profile-visible-hydration-activity',
+        description: 'show the new Água (hydration) and Atividade (activity) modules on existing profiles',
+        run: async () => {
+          const n = await addVisibleModules.execute(['hydration', 'activity']);
+          return `${n} profile(s) updated`;
+        },
+      },
+    ],
     profileReader,
     profileProvisioner: { provision: (input, tx) => provision.execute(input, tx) },
   };

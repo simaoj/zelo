@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CSRF_COOKIE, CSRF_HEADER, type CookieSettings } from './cookies.js';
 import { HttpError } from './errors.js';
+import './auth.js'; // FastifyContextConfig augmentation (integrationAuth)
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -21,6 +22,8 @@ function equal(a: string, b: string): boolean {
 export function registerCsrf(app: FastifyInstance, settings: CookieSettings): void {
   app.addHook('onRequest', async (request) => {
     if (SAFE_METHODS.has(request.method)) return;
+    // bearer-token integration routes never read the session cookie → CSRF does not apply
+    if (request.routeOptions.config?.integrationAuth) return;
     const cookie = request.cookies[CSRF_COOKIE];
     const header = request.headers[CSRF_HEADER];
     if (!cookie || typeof header !== 'string' || !equal(cookie, header)) {

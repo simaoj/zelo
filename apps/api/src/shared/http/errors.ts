@@ -39,7 +39,8 @@ export function toApiError(err: unknown, correlationId: string): { status: numbe
       if (Object.keys(err.fieldErrors).length) body.fieldErrors = err.fieldErrors;
     }
     if (err instanceof VersionConflictError && err.current !== undefined) body.current = err.current;
-    return { status: STATUS_BY_CODE[err.code], body };
+    const override = (err as { httpStatus?: number }).httpStatus;
+    return { status: override ?? STATUS_BY_CODE[err.code], body };
   }
   if (err instanceof HttpError) {
     return { status: STATUS_BY_CODE[err.code], body: { code: err.code, message: err.message, correlationId } };
@@ -60,6 +61,9 @@ export function toApiError(err: unknown, correlationId: string): { status: numbe
   const fe = err as Partial<FastifyError>;
   if (fe?.statusCode === 429) {
     return { status: 429, body: { code: 'RATE_LIMITED', message: 'Muitas tentativas. Aguarde um pouco e tente novamente.', correlationId } };
+  }
+  if (fe?.statusCode === 413) {
+    return { status: 413, body: { code: 'VALIDATION_ERROR', message: 'Corpo da requisição acima do limite permitido.', correlationId } };
   }
   if (!isResponseSerializationError(err) && typeof fe?.statusCode === 'number' && fe.statusCode >= 400 && fe.statusCode < 500) {
     // e.g. malformed JSON, unsupported media type, body too large

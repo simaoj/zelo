@@ -59,3 +59,11 @@ export class UnauthenticatedError extends AppError {
     super('Sessão expirada. Entre novamente.');
   }
 }
+
+/**
+ * Well-formed input that is incompatible with a data contract (e.g. a health export that is not a
+ * consolidated daily total). Same ApiError code as validation, but HTTP 422 instead of 400.
+ */
+export class UnprocessableInputError extends ValidationError {
+  readonly httpStatus = 422;
+}

@@ -1,6 +1,7 @@
 import { ValidationError } from '../../../shared/domain/errors.js';
 
-export const VISIBLE_MODULES = ['body', 'bloodPressure', 'routine'] as const;
+/** Same order as MODULES in @zelo/contracts. New sign-ups see every module. */
+export const VISIBLE_MODULES = ['body', 'bloodPressure', 'hydration', 'activity', 'routine'] as const;
 export type VisibleModule = (typeof VISIBLE_MODULES)[number];
 
 export interface Profile {

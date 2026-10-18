@@ -1,6 +1,6 @@
 import type { DashboardResponse, Occurrence } from '@zelo/contracts';
 import type { Clock } from '../../../../shared/application/ports.js';
-import type { HealthSnapshotReader, ProfileReader } from '../../../../shared/application/cross-module-ports.js';
+import type { ActivitySnapshotReader, HealthSnapshotReader, HydrationSnapshotReader, ProfileReader } from '../../../../shared/application/cross-module-ports.js';
 import { ValidationError } from '../../../../shared/domain/errors.js';
 
 /** Port to the routine module (implemented by routine's public OccurrenceQuery). */
@@ -25,24 +25,34 @@ function assertDate(date: string): void {
 /**
  * GetDailyDashboard — "Hoje" summary. `date` defaults to today in the PROFILE timezone.
  * Latest weight/BP/measurement are the most recent records overall (with their own dates, so the UI
- * can flag old ones — never presented as today's); occurrences are those of `date`, by scheduledAt.
+ * can flag old ones — never presented as today's); occurrences are those of `date`, by scheduledAt;
+ * hydration (water of `date`) and activity (received steps/workouts of `date`) come from their modules.
  */
 export class GetDailyDashboard {
   constructor(
-    private readonly d: { profiles: ProfileReader; snapshots: HealthSnapshotReader; occurrences: DailyOccurrences; clock: Clock },
+    private readonly d: {
+      profiles: ProfileReader;
+      snapshots: HealthSnapshotReader;
+      occurrences: DailyOccurrences;
+      hydration: HydrationSnapshotReader;
+      activity: ActivitySnapshotReader;
+      clock: Clock;
+    },
   ) {}
 
   async execute(userId: string, date?: string): Promise<DashboardResponse> {
     const timezone = await this.d.profiles.getTimezone(userId);
     const day = date ?? localToday(this.d.clock.now(), timezone);
     assertDate(day);
-    const [displayName, latestWeight, weightSparkline, latestBloodPressure, latestMeasurement, occurrences] = await Promise.all([
+    const [displayName, latestWeight, weightSparkline, latestBloodPressure, latestMeasurement, occurrences, hydration, activity] = await Promise.all([
       this.d.profiles.getDisplayName(userId),
       this.d.snapshots.latestWeight(userId),
       this.d.snapshots.recentWeights(userId, SPARKLINE_POINTS),
       this.d.snapshots.latestBloodPressure(userId),
       this.d.snapshots.latestMeasurement(userId),
       this.d.occurrences.listForDate(userId, day),
+      this.d.hydration.dayFor(userId, day, timezone),
+      this.d.activity.todayFor(userId, day, timezone),
     ]);
     return {
       date: day,
@@ -53,6 +63,8 @@ export class GetDailyDashboard {
       latestBloodPressure,
       latestMeasurement,
       occurrences: [...occurrences].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)),
+      hydration,
+      activity,
     };
   }
 }

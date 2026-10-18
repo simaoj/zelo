@@ -9,7 +9,8 @@
  *   - registers each module's `httpRoutes` Fastify plugin under /api/v1 (authenticated by default);
  *   - feeds `syncReaders` to the sync module (bootstrap snapshot + changes feed);
  *   - feeds `syncHandlers` to the sync dispatcher (POST /sync/operations);
- *   - calls `ensureIndexes` from the index/migration script and at startup.
+ *   - calls `ensureIndexes` from the index/migration script and at startup;
+ *   - runs `migrations` (once each, tracked in the `migrations` collection) from the migrate script.
  *
  * Modules must not import other modules' internals — only ports declared here or in
  * another module's `index.ts` public API.
@@ -46,6 +47,14 @@ export interface SyncOperationHandler {
   handle(actor: Actor, entityId: string, payload: unknown, tx: TxContext): Promise<{ status: number; body: unknown }>;
 }
 
+export interface ModuleMigration {
+  /** stable unique id, e.g. "2026-10-18-profile-visible-hydration-activity" */
+  id: string;
+  description: string;
+  /** must be safe to re-run if it fails half-way; returns a short summary for the log */
+  run: () => Promise<string>;
+}
+
 export interface ModuleDefinition {
   name: string;
   /** Fastify plugin; `request.actor` (Actor) is set by the auth hook for authenticated routes. */
@@ -53,6 +62,8 @@ export interface ModuleDefinition {
   syncReaders?: SyncReader[];
   syncHandlers?: SyncOperationHandler[];
   ensureIndexes?: () => Promise<void>;
+  /** one-off data migrations; each id runs at most once per database (see bootstrap/migrations.ts) */
+  migrations?: ModuleMigration[];
   /** background jobs (e.g. notifications worker); started only by the worker entrypoint */
   jobs?: { name: string; start: () => Promise<() => Promise<void>> }[];
 }

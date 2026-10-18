@@ -11,16 +11,22 @@ import { MongoUnitOfWork } from '../shared/adapters/mongo-unit-of-work.js';
 import { SystemClock } from '../shared/adapters/system-clock.js';
 import { UuidGenerator } from '../shared/adapters/uuid-generator.js';
 import type { SessionResolver } from '../shared/http/auth.js';
+import { createActivityModule } from '../modules/activity/index.js';
 import { createBloodPressureModule } from '../modules/blood-pressure/index.js';
 import { createBodyModule } from '../modules/body/index.js';
 import { createDashboardModule } from '../modules/dashboard/index.js';
+import { createHydrationModule } from '../modules/hydration/index.js';
 import { createIdentityModule, NodemailerMailer } from '../modules/identity/index.js';
+import { MongoUserRepository } from '../modules/identity/adapters/out/mongodb/mongo-identity-repositories.js';
+import { normalizeEmail } from '../modules/identity/domain/user.js';
+import { createIntegrationsModule, type IntegrationUseCases, type UserDirectory } from '../modules/integrations/index.js';
 import type { Mailer, PasswordHasher } from '../modules/identity/application/ports/out/index.js';
 import { createNotificationsModule } from '../modules/notifications/index.js';
 import { createProfileModule } from '../modules/profile/index.js';
 import { createRoutineModule } from '../modules/routine/index.js';
 import { createSyncModule } from '../modules/sync/index.js';
 import type { AppConfig } from './config.js';
+import { runMigrations } from './migrations.js';
 import type { CoreDeps, ModuleDefinition } from './module-contract.js';
 
 export interface Container {
@@ -33,8 +39,12 @@ export interface Container {
   sessionResolver: SessionResolver;
   changeLog: MongoChangeLog;
   idempotency: MongoIdempotentExecutor;
+  /** integration tokens (admin script) */
+  integrationTokens: IntegrationUseCases;
   /** creates every index (idempotent) */
   ensureIndexes(): Promise<void>;
+  /** runs pending one-off data migrations (migrate script); returns applied ids */
+  runMigrations(log?: (msg: string) => void): Promise<string[]>;
   close(): Promise<void>;
 }
 
@@ -71,7 +81,22 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     latestMeasurement: (u) => body.snapshot.latestMeasurement(u),
     latestBloodPressure: (u) => bloodPressure.snapshot.latestBloodPressure(u),
   };
-  const dashboard = createDashboardModule({ ...core, profileReader: profile.profileReader, snapshotReader, occurrenceQuery: routine.occurrenceQuery });
+  const hydration = createHydrationModule({ ...core, profileReader: profile.profileReader });
+  // composition root may use identity's adapter directly: the admin script resolves users by e-mail
+  const users = new MongoUserRepository(db);
+  const userDirectory: UserDirectory = {
+    findUserIdByEmail: async (email) => (await users.findByEmail(normalizeEmail(email)))?.id ?? null,
+  };
+  const integrations = createIntegrationsModule({ ...core, users: userDirectory });
+  const activity = createActivityModule({ ...core, profileReader: profile.profileReader, integrationAuth: integrations.authenticator });
+  const dashboard = createDashboardModule({
+    ...core,
+    profileReader: profile.profileReader,
+    snapshotReader,
+    occurrenceQuery: routine.occurrenceQuery,
+    hydrationSnapshot: hydration.hydrationSnapshot,
+    activitySnapshot: activity.activitySnapshot,
+  });
   const identity = createIdentityModule({
     ...core,
     profileProvisioner: profile.profileProvisioner,
@@ -83,7 +108,7 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     ...(config.rateLimit.enabled ? { authRateLimit: config.rateLimit.authMax } : {}),
   });
 
-  const feature: ModuleDefinition[] = [identity, profile, body, bloodPressure, routine, dashboard, notifications];
+  const feature: ModuleDefinition[] = [identity, profile, body, bloodPressure, hydration, activity, integrations, routine, dashboard, notifications];
   const sync = createSyncModule({
     ...core,
     changeFeed: changeLog,
@@ -101,11 +126,13 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     sessionResolver: identity.sessionResolver,
     changeLog,
     idempotency,
+    integrationTokens: integrations.tokens,
     async ensureIndexes() {
       await changeLog.ensureIndexes();
       await idempotency.ensureIndexes();
       for (const m of modules) await m.ensureIndexes?.();
     },
+    runMigrations: (log) => runMigrations(db, modules, log),
     async close() {
       if (ownsClient) await client.close();
     },

@@ -13,6 +13,12 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** Route does not require an authenticated session. */
     public?: boolean;
+    /**
+     * Route authenticates machine clients itself with `Authorization: Bearer <integration token>`
+     * (e.g. POST /imports/health). The session cookie is ignored (no `request.actor` from it) and
+     * CSRF is not required, since no ambient browser credential is used.
+     */
+    integrationAuth?: boolean;
   }
 }
 
@@ -22,6 +28,7 @@ declare module 'fastify' {
  */
 export function registerAuth(app: FastifyInstance, resolver: SessionResolver): void {
   app.addHook('preHandler', async (request) => {
+    if (request.routeOptions.config.integrationAuth) return; // route-level bearer auth
     const raw = request.cookies[SESSION_COOKIE];
     if (raw) {
       const actor = await resolver.resolve(raw);

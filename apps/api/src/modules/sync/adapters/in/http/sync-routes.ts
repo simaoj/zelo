@@ -44,6 +44,11 @@ export function syncRoutes(service: SyncService): FastifyPluginAsync {
           routineItems: data.routineItem ?? [],
           occurrences: data.occurrence ?? [],
           intakeRecords: data.intakeRecord ?? [],
+          waterEntries: data.waterEntry ?? [],
+          hydrationGoal: data.hydrationGoal?.[0] ?? null,
+          dailySteps: data.dailySteps ?? [],
+          activityGoal: data.activityGoal?.[0] ?? null,
+          workouts: data.workout ?? [],
         } as z.infer<typeof SyncBootstrapResponse>;
       },
     );

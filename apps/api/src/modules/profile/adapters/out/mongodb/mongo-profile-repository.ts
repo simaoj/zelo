@@ -66,6 +66,13 @@ export class MongoProfileRepository implements ProfileRepository {
     return res.matchedCount === 1;
   }
 
+  async listUserIdsMissingModules(modules: readonly VisibleModule[]): Promise<string[]> {
+    const docs = await this.col
+      .find({ $or: modules.map((m) => ({ visibleModules: { $ne: m } })) }, { projection: { userId: 1 } })
+      .toArray();
+    return docs.map((d) => d.userId);
+  }
+
   async ensureIndexes(): Promise<void> {
     await this.col.createIndex({ userId: 1 }, { unique: true, name: 'userId_unique' });
   }
