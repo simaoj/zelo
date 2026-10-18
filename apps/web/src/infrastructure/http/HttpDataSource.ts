@@ -28,6 +28,20 @@ import {
   type WeightEntry,
   type WeightGoal,
   type WeightPage,
+  type ActivityGoal,
+  type ActivityToday,
+  type CreateWaterEntryRequest,
+  type HydrationGoal,
+  type HydrationSummary,
+  type PutActivityGoalRequest,
+  type PutHydrationGoalRequest,
+  type StepsSummary,
+  type UpdateWaterEntryRequest,
+  type WaterEntry,
+  type WaterEntryPage,
+  type Workout,
+  type WorkoutPage,
+  type WorkoutsQuery,
 } from '@zelo/contracts';
 import { DataError, type Mutation, type ZeloDataSource } from '@/shared/data/ports';
 import type { HttpClient } from './client';
@@ -170,5 +184,64 @@ export class HttpDataSource implements ZeloDataSource {
   }
   async deleteIntake(id: string, input: DeleteRequest) {
     await this.mutate<null>('DELETE', routes.intake(id), input);
+  }
+
+  // hydration
+  listWaterEntries(q: HistoryQuery) {
+    return this.http.request<WaterEntryPage>('GET', routes.waterEntries, { query: q });
+  }
+  createWaterEntry(input: CreateWaterEntryRequest) {
+    return this.server<WaterEntry>('POST', routes.waterEntries, input);
+  }
+  updateWaterEntry(id: string, input: UpdateWaterEntryRequest) {
+    return this.server<WaterEntry>('PATCH', routes.waterEntry(id), input);
+  }
+  deleteWaterEntry(id: string, input: DeleteRequest) {
+    return this.server<null>('DELETE', routes.waterEntry(id), input);
+  }
+  getHydrationSummary(from: string, to: string) {
+    return this.http.request<HydrationSummary>('GET', routes.hydrationSummary, { query: { from, to } });
+  }
+  async getHydrationGoal() {
+    try {
+      return await this.http.request<HydrationGoal>('GET', routes.hydrationGoal);
+    } catch (e) {
+      if (e instanceof DataError && e.status === 404) return null;
+      throw e;
+    }
+  }
+  putHydrationGoal(input: PutHydrationGoalRequest) {
+    return this.mutate<HydrationGoal>('PUT', routes.hydrationGoal, input);
+  }
+  async deleteHydrationGoal() {
+    await this.mutate<null>('DELETE', routes.hydrationGoal);
+  }
+
+  // activity (read-only received data + optional steps goal)
+  getActivityToday(date?: string) {
+    return this.http.request<ActivityToday>('GET', routes.activityToday, { query: { date } });
+  }
+  getStepsSummary(from: string, to: string) {
+    return this.http.request<StepsSummary>('GET', routes.activitySteps, { query: { from, to } });
+  }
+  listWorkouts(q: WorkoutsQuery) {
+    return this.http.request<WorkoutPage>('GET', routes.workouts, { query: q });
+  }
+  getWorkout(id: string) {
+    return this.http.request<Workout>('GET', routes.workout(id));
+  }
+  async getActivityGoal() {
+    try {
+      return await this.http.request<ActivityGoal>('GET', routes.activityGoal);
+    } catch (e) {
+      if (e instanceof DataError && e.status === 404) return null;
+      throw e;
+    }
+  }
+  putActivityGoal(input: PutActivityGoalRequest) {
+    return this.mutate<ActivityGoal>('PUT', routes.activityGoal, input);
+  }
+  async deleteActivityGoal() {
+    await this.mutate<null>('DELETE', routes.activityGoal);
   }
 }
