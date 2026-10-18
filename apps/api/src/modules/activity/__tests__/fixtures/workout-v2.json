@@ -1,0 +1,15 @@
+{
+  "data": {
+    "workouts": [
+      {
+        "id": "706e08a9-66a1-4820-83dd-f7c6e314ff66",
+        "name": "Running",
+        "start": "2026-10-18 07:00:00 -0300",
+        "end": "2026-10-18 07:30:00 -0300",
+        "duration": 1800,
+        "distance": { "qty": 4.2, "units": "km" },
+        "activeEnergyBurned": { "qty": 310, "units": "kcal" }
+      }
+    ]
+  }
+}

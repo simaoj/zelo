@@ -63,6 +63,12 @@ export function activityRoutes(uc: ActivityUseCases, idempotency: IdempotentExec
         onRequest: async (request) => {
           const { userId } = await auth.authenticate(bearerToken(request));
           request.actor = { userId };
+          // Auto Export sends JSON as application/json; anything else (incl. text/plain, which Fastify
+          // would parse as a string) is refused with 415 before the body is read.
+          const type = request.headers['content-type'];
+          if (typeof type !== 'string' || !/^application\/json\s*(;|$)/i.test(type)) {
+            throw Object.assign(new Error('Content-Type deve ser application/json'), { statusCode: 415 });
+          }
         },
         schema: {
           tags: ['imports'],
@@ -71,7 +77,7 @@ export function activityRoutes(uc: ActivityUseCases, idempotency: IdempotentExec
             'Auth: `Authorization: Bearer <integration token>` (created by the admin script). Session cookie and CSRF are not used. ' +
             `Body ≤ ${HEALTH_IMPORT_MAX_BYTES} bytes, \`application/json\`, envelope {data:{metrics?, workouts?}}. ` +
             '400 invalid structure (fieldErrors by JSON path) · 401 missing/invalid/revoked token · 413 body too large · ' +
-            '422 not a consolidated daily total (e.g. same day twice) · 500 persistence failure (safe to resend).',
+            '415 not application/json · 422 not a consolidated daily total (e.g. same day twice) · 500 persistence failure (safe to resend).',
           security: [{ integrationToken: [] }],
           response: { 200: HealthImportResponse, 413: errorResponses[400], 500: errorResponses[400], ...errorResponses },
         },
