@@ -4,6 +4,7 @@ import type { IntakeStatus, Occurrence } from '@zelo/contracts';
 import { useZelo } from '@/shared/data/ZeloProvider';
 import { useIntent } from '@/shared/data/intent';
 import { useSubmit } from '@/shared/data/useSubmit';
+import { useDirtyGuard } from '@/shared/data/useDirtyGuard';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Button } from '@/shared/ui/Button';
 import { FormError, TextAreaField } from '@/shared/ui/Field';
@@ -16,6 +17,7 @@ export function IntakeEditDialog({ occurrence: o, tz, onClose }: { occurrence: O
   const { data } = useZelo();
   const toast = useToast();
   const intent = useIntent();
+  const guard = useDirtyGuard();
   const { pending, error, run } = useSubmit();
   const [status, setStatus] = useState<IntakeStatus>(o.intake?.status ?? 'taken');
   const [when, setWhen] = useState(() => (o.intake?.actualTakenAt ? fromInstant(o.intake.actualTakenAt, tz) : nowInTz(tz)));
@@ -53,7 +55,7 @@ export function IntakeEditDialog({ occurrence: o, tz, onClose }: { occurrence: O
 
   return (
     <Dialog open onClose={onClose} title={o.nameSnapshot} description={`Programado para ${o.localTime} • ${formatDose(o.doseSnapshot, o.unitSnapshot)}`}>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <form onChange={guard.markDirty} data-zelo-editing={guard.dirty || undefined} onSubmit={submit} noValidate className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-[13px] font-semibold">Decisão</legend>
           {(['taken', 'not_taken'] as const).map((s) => (

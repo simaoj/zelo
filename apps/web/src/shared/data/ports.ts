@@ -117,6 +117,7 @@ export interface ZeloDataSource {
   putOccurrenceIntake(occurrenceId: string, input: PutOccurrenceIntakeRequest): Promise<Mutation<IntakeRecord>>;
   undoOccurrenceIntake(occurrenceId: string, input: DeleteRequest): Promise<Mutation<null>>;
   createIntake(input: CreateIntakeRequest): Promise<Mutation<IntakeRecord>>;
+  listIntakes(q: HistoryQuery): Promise<{ items: IntakeRecord[]; nextCursor: string | null }>;
   updateIntake(id: string, input: UpdateIntakeRequest): Promise<IntakeRecord>;
   deleteIntake(id: string, input: DeleteRequest): Promise<void>;
 

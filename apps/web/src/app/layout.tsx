@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Newsreader, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
 import { pwaMetadata, pwaViewport } from '@/pwa/metadata';
 import { Providers } from './providers';
 import './globals.css';
 
-const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader', display: 'swap', weight: ['500', '600'] });
-const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta', display: 'swap' });
+const newsreader = localFont({ src: './fonts/newsreader.ttf', variable: '--font-newsreader', display: 'swap', weight: '200 800' });
+const jakarta = localFont({ src: './fonts/plus-jakarta-sans.ttf', variable: '--font-jakarta', display: 'swap', weight: '200 800' });
 
 export const metadata: Metadata = {
   ...pwaMetadata,

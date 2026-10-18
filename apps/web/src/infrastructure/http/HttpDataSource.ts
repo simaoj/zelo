@@ -162,6 +162,9 @@ export class HttpDataSource implements ZeloDataSource {
   createIntake(input: CreateIntakeRequest) {
     return this.server<IntakeRecord>('POST', routes.intakes, input);
   }
+  listIntakes(q: HistoryQuery) {
+    return this.http.request<{ items: IntakeRecord[]; nextCursor: string | null }>('GET', routes.intakes, { query: q });
+  }
   updateIntake(id: string, input: UpdateIntakeRequest) {
     return this.mutate<IntakeRecord>('PATCH', routes.intake(id), input);
   }

@@ -19,6 +19,7 @@ import { cx } from '@/shared/ui/cx';
 import { OccurrenceCard } from './OccurrenceCard';
 import { AdHocIntakeForm } from './AdHocIntakeForm';
 import { ItemForm } from './ItemForm';
+import { IntakeHistory } from './IntakeHistory';
 import { describeSchedule } from './itemLogic';
 import { effectiveState, formatDose, isDecided } from './occurrenceLogic';
 
@@ -58,6 +59,7 @@ export function RoutinePage() {
           <ItemsTab creating={creating} setCreating={setCreating} />
         )}
       </TabPanel>
+      <IntakeHistory />
     </div>
   );
 }

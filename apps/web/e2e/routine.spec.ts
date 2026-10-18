@@ -25,3 +25,36 @@ test('routine item → mark as taken → undo', async ({ page }) => {
   await expect(card.getByRole('button', { name: 'Marcar como tomado' })).toBeVisible();
   await expect(card.getByText('Programado')).toBeVisible();
 });
+
+test('ad-hoc intake remains visible after reload and supports editing and deletion', async ({ page }) => {
+  await signUpViaApi(page);
+  await page.goto('/rotina?aba=itens');
+  await page.getByRole('button', { name: 'Novo item' }).click();
+  const item = page.getByRole('dialog', { name: 'Novo item' });
+  await item.getByLabel('Nome').fill('Suplemento avulso');
+  await item.getByLabel('Dose').fill('1');
+  await item.getByLabel('Unidade').fill('cápsula');
+  await item.getByLabel('Horário 1').fill('23:59');
+  await item.getByRole('button', { name: 'Adicionar item' }).click();
+  await expect(item).toBeHidden();
+  await page.getByRole('tab', { name: 'Hoje' }).click();
+  await page.getByRole('button', { name: 'Registrar tomada avulsa', exact: true }).click();
+  const intake = page.getByRole('dialog', { name: 'Tomada avulsa' });
+  await intake.getByRole('combobox', { name: 'Item', exact: true }).selectOption({ label: 'Suplemento avulso — 1 cápsula' });
+  await intake.getByLabel('Observação').fill('Registro independente');
+  await intake.getByRole('button', { name: 'Registrar tomada avulsa' }).click();
+  await expect(intake).toBeHidden();
+  await page.reload();
+  const history = page.locator('section[aria-labelledby="intake-history"]');
+  await expect(history.getByText('Registro independente')).toBeVisible();
+  await expect(page.getByRole('article', { name: /Suplemento avulso/ }).getByText('Programado')).toBeVisible();
+  await history.getByRole('button', { name: /Editar tomada/ }).click();
+  const edit = page.getByRole('dialog', { name: 'Editar tomada' });
+  await edit.getByLabel('Observação').fill('Observação corrigida');
+  await edit.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await expect(edit).toBeHidden();
+  await expect(history.getByText('Observação corrigida')).toBeVisible();
+  await history.getByRole('button', { name: /Excluir tomada/ }).click();
+  await page.getByRole('dialog', { name: 'Excluir registro de tomada?' }).getByRole('button', { name: 'Excluir', exact: true }).click();
+  await expect(history.getByText('Nenhuma tomada registrada')).toBeVisible();
+});

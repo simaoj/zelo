@@ -135,6 +135,8 @@ export const OCCURRENCE_STATE_LABELS: Record<OccurrenceState, string> = {
 };
 
 export const IntakeRecord = ResourceMeta.extend({
+  /** History instant; optional for caches created before this field was introduced. */
+  sortAt: Instant.optional(),
   itemId: Id,
   occurrenceId: Id.nullable(),
   status: IntakeStatus,

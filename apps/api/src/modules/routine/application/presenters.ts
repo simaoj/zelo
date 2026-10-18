@@ -49,6 +49,7 @@ export function toItemDto(item: RoutineItem, schedule: ScheduleVersion | null): 
 
 export function toIntakeDto(r: IntakeRecord): IntakeDto {
   return {
+    sortAt: iso(r.sortAt),
     id: r.id,
     version: r.version,
     createdAt: iso(r.createdAt),

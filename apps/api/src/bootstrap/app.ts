@@ -75,6 +75,7 @@ export async function buildApp(container: Container): Promise<FastifyInstance> {
   if (config.rateLimit.enabled) {
     await app.register(rateLimit, {
       global: true,
+      keyGenerator: (request) => `${request.method === 'GET' ? 'read' : 'write'}:${request.ip}`,
       max: (request) => (request.method === 'GET' ? config.rateLimit.globalMax : config.rateLimit.writeMax),
       timeWindow: '1 minute',
       errorResponseBuilder: (_req, ctx) => ({ statusCode: 429, code: 'RATE_LIMITED', message: `Rate limit exceeded, retry in ${ctx.after}` }),
