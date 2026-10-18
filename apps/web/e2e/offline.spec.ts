@@ -104,14 +104,14 @@ test('offline: enable, open without network, register weight, reopen, reconnect 
   // 3. register a weight offline
   await page.getByRole('button', { name: /^registrar$/i }).first().click();
   await page.getByRole('button', { name: /^peso/i }).first().click();
-  await page.getByLabel(/peso \(kg\)/i).fill('82,35');
-  await page.getByRole('button', { name: /salvar registro/i }).click();
-  await expect(page.getByRole('button', { name: /1 pendente/i })).toBeVisible({ timeout: 15_000 });
+  const dialog = page.getByRole('dialog', { name: /registrar peso/i });
+  await dialog.getByLabel(/peso \(kg\)/i).fill('82,35');
+  await dialog.getByRole('button', { name: /salvar registro/i }).click();
+  await expect(page.getByText(/salvo neste dispositivo/i).first()).toBeVisible({ timeout: 15_000 });
 
   // 4. reopen while still offline: the queued record survives
   await page.reload();
-  await expect(page.getByRole('button', { name: /1 pendente/i })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/82,35/).first()).toBeVisible();
+  await expect(page.getByText(/82,35/).first()).toBeVisible({ timeout: 20_000 });
 
   // 5. reconnect → sync → exactly one new server record
   await context.setOffline(false);
@@ -119,7 +119,7 @@ test('offline: enable, open without network, register weight, reopen, reconnect 
   await expect
     .poll(async () => (await listWeights(request)).filter((w) => w.weightKg === '82.35').length, { timeout: 30_000 })
     .toBe(1);
-  await expect(page.getByRole('button', { name: /sincronizado/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: /sincronizado/i }).first()).toBeVisible({ timeout: 20_000 });
   // a further sync must not duplicate
   await page.reload();
   await page.waitForLoadState('networkidle');

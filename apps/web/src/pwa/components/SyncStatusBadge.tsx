@@ -53,7 +53,7 @@ export function SyncStatusBadge() {
   let tone = 'bg-surface text-ink border-line';
   let Icon = CheckCircle2;
   if (!online) {
-    label = 'Offline';
+    label = pending > 0 ? `Offline · ${pending === 1 ? '1 pendente' : `${pending} pendentes`}` : 'Offline';
     tone = 'bg-wash-sun text-ink border-[#efe2a6]';
     Icon = CloudOff;
   } else if (conflicts > 0) {
