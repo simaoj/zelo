@@ -45,6 +45,7 @@ import {
 } from '@zelo/contracts';
 import { DataError, type Mutation, type ZeloDataSource } from '@/shared/data/ports';
 import type { HttpClient } from './client';
+import { uuid } from '@/shared/lib/ids';
 
 /** Online-only data source that talks to the Zelo API. */
 export class HttpDataSource implements ZeloDataSource {
@@ -114,7 +115,7 @@ export class HttpDataSource implements ZeloDataSource {
     return this.mutate<WeightGoal>('PUT', routes.weightGoal, input);
   }
   async deleteWeightGoal() {
-    await this.mutate<null>('DELETE', routes.weightGoal);
+    await this.mutate<null>('DELETE', routes.weightGoal, { operationId: uuid() });
   }
 
   // measurements
@@ -214,7 +215,7 @@ export class HttpDataSource implements ZeloDataSource {
     return this.mutate<HydrationGoal>('PUT', routes.hydrationGoal, input);
   }
   async deleteHydrationGoal() {
-    await this.mutate<null>('DELETE', routes.hydrationGoal);
+    await this.mutate<null>('DELETE', routes.hydrationGoal, { operationId: uuid() });
   }
 
   // activity (read-only received data + optional steps goal)
@@ -242,6 +243,6 @@ export class HttpDataSource implements ZeloDataSource {
     return this.mutate<ActivityGoal>('PUT', routes.activityGoal, input);
   }
   async deleteActivityGoal() {
-    await this.mutate<null>('DELETE', routes.activityGoal);
+    await this.mutate<null>('DELETE', routes.activityGoal, { operationId: uuid() });
   }
 }
