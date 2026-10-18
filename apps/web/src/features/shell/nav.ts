@@ -27,3 +27,10 @@ export function sectionTitle(pathname: string): string {
   return all.find((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))?.title ?? 'Zelo';
 }
 
+
+/** The nav item whose module is hidden in the profile, if the user opened its route directly. */
+export function hiddenSectionFor(pathname: string, modules: readonly Module[]): NavItem | undefined {
+  return NAV_ITEMS.find(
+    (i) => i.module && !modules.includes(i.module) && (pathname === i.href || pathname.startsWith(`${i.href}/`)),
+  );
+}

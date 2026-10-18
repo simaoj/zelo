@@ -8,7 +8,7 @@ import { useSession } from '@/shared/data/session';
 import { useSyncStatus } from '@/shared/data/hooks';
 import { Logo } from '@/shared/ui/Logo';
 import { cx } from '@/shared/ui/cx';
-import { SETTINGS_ITEM, sectionTitle, visibleNav, type NavItem } from './nav';
+import { SETTINGS_ITEM, hiddenSectionFor, sectionTitle, visibleNav, type NavItem } from './nav';
 import { useRegister } from './RegisterDialog';
 
 function isActive(pathname: string, href: string) {
@@ -22,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { open } = useRegister();
   const title = sectionTitle(pathname);
   const half = Math.ceil(nav.length / 2);
+  const hidden = hiddenSectionFor(pathname, profile.visibleModules);
 
   return (
     <div className="min-h-dvh">
@@ -89,7 +90,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           tabIndex={-1}
           className="mx-auto w-full max-w-[1160px] px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-5 focus:outline-none sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"
         >
-          {children}
+          {hidden ? (
+            <section className="rounded-[var(--radius-card)] border border-line bg-surface p-6 shadow-[var(--shadow-card)]">
+              <h1 className="font-display text-2xl font-semibold">{hidden.title} está oculto</h1>
+              <p className="mt-2 text-ink-muted">
+                Você escolheu não exibir esta seção. Seus registros continuam guardados e você pode mostrá-la de novo quando quiser.
+              </p>
+              <Link
+                href="/configuracoes"
+                className="mt-4 inline-flex min-h-11 items-center rounded-full bg-brand-orange px-5 font-semibold text-ink hover:bg-brand-orange-strong"
+              >
+                Abrir configurações
+              </Link>
+            </section>
+          ) : (
+            children
+          )}
         </main>
       </div>
 
