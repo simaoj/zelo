@@ -1,7 +1,8 @@
 /**
  * PWA E2E (production build only — the service worker is not registered in `next dev`).
  * Covers spec §11: manifest + SW, offline shell after enabling offline, offline weight creation
- * that survives a reload and syncs exactly once after reconnecting.
+ * that survives a reload and syncs exactly once after reconnecting; the same for a water quick-add
+ * (água reuses the existing offline queue — spec água/atividade §4 and §11).
  */
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
@@ -31,6 +32,22 @@ async function listWeights(request: APIRequestContext) {
   const res = await request.get(`${API}/weights?limit=200`);
   expect(res.ok()).toBeTruthy();
   return ((await res.json()) as { items: Array<{ id: string; weightKg: string }> }).items;
+}
+
+async function listWater(request: APIRequestContext) {
+  const res = await request.get(`${API}/water-entries?limit=200`);
+  expect(res.ok(), await res.text()).toBeTruthy();
+  return ((await res.json()) as { items: Array<{ id: string; amountMl: number }> }).items;
+}
+
+async function enableOffline(page: Page) {
+  await page.goto('/configuracoes');
+  await waitForServiceWorkerControl(page);
+  const toggle = page.getByRole('switch', { name: /usar offline neste dispositivo/i });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.getByText(/seus dados foram baixados/i)).toBeVisible({ timeout: 20_000 });
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
 }
 
 async function waitForServiceWorkerControl(page: Page) {
@@ -125,4 +142,35 @@ test('offline: enable, open without network, register weight, reopen, reconnect 
   await page.waitForLoadState('networkidle');
   expect((await listWeights(request)).filter((w) => w.weightKg === '82.35')).toHaveLength(1);
   expect(await listWeights(request)).toHaveLength(2);
+});
+
+test('offline water: quick-add 300 ml offline, reload offline, reconnect → exactly one entry', async ({ page, context }) => {
+  const request = page.request;
+  await signUp(request);
+  expect(await listWater(request)).toHaveLength(0);
+
+  // the water page must be in the precached shell before going offline
+  await page.goto('/saude/agua');
+  await enableOffline(page);
+  await page.goto('/saude/agua');
+  await expect(page.getByRole('button', { name: /registrar 300 ml agora/i })).toBeVisible({ timeout: 20_000 });
+
+  await context.setOffline(true);
+  await page.getByRole('button', { name: /registrar 300 ml agora/i }).click();
+  await expect(page.getByText(/salvo neste dispositivo/i).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: /1 pendente/i }).first()).toBeVisible();
+
+  // reopen while offline: the queued entry is still there (IndexedDB), still pending
+  await page.reload();
+  await expect(page.getByText(/300 ml/).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: /1 pendente/i }).first()).toBeVisible({ timeout: 20_000 });
+
+  // reconnect → one entry on the server, never two
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(async () => (await listWater(request)).filter((w) => w.amountMl === 300).length, { timeout: 30_000 }).toBe(1);
+  await expect(page.getByRole('button', { name: /sincronizado/i }).first()).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  expect(await listWater(request)).toHaveLength(1);
 });
