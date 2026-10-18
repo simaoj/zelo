@@ -61,7 +61,7 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
   const core: CoreDeps = { db, clock, ids, uow, changeLog, idempotency };
 
   const profile = createProfileModule(core);
-  const notifications = createNotificationsModule({ ...core, profileReader: profile.profileReader });
+  const notifications = createNotificationsModule({ ...core, profileReader: profile.profileReader, vapid: config.vapid });
   const routine = createRoutineModule({ ...core, profileReader: profile.profileReader });
   const body = createBodyModule(core);
   const bloodPressure = createBloodPressureModule(core);
