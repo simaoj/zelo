@@ -40,6 +40,8 @@ services:
       MONGODB_URI: mongodb://mongo:27017/zelo?replicaSet=rs0
       SMTP_URL: smtp://mailpit:1025
       PORT: 4000
+      # raise only for local e2e runs (many sign-ups from one IP); default 10/min
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
     ports: ["${API_PORT:-4000}:4000"]
     depends_on:
       mongo: { condition: service_healthy }

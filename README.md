@@ -67,6 +67,17 @@ pnpm --filter @zelo/web test          # unit/componentes + IndexedDB (fake-index
 docker compose up -d --build && pnpm --filter @zelo/web test:e2e   # Playwright contra a stack Docker
 ```
 
+Os E2E criam várias contas seguidas a partir do mesmo IP, e a API limita login/cadastro a
+10 requisições por minuto por IP. Para a suíte completa, suba a API com um limite maior **só
+durante os testes** e volte ao padrão depois:
+
+```bash
+AUTH_RATE_LIMIT_MAX=200 docker compose up -d api
+E2E_BASE_URL=http://localhost:3100 pnpm --filter @zelo/web exec playwright test --workers=1
+E2E_BASE_URL=http://localhost:3100 pnpm --filter @zelo/web exec playwright test -c e2e/playwright.pwa.config.ts --workers=1
+docker compose up -d api   # volta ao padrão (10/min)
+```
+
 Cobertura principal: regras de domínio (decimais, medidas, datas, horário de verão, estados de
 tomada, versionamento de programação), casos de uso com portas fake, integração com replica set
 (índices, transações, isolamento entre contas, idempotência, conflitos de versão, tombstones,

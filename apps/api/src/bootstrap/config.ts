@@ -21,6 +21,8 @@ const EnvSchema = z.object({
   VAPID_SUBJECT: z.string().optional().default('mailto:admin@zelo.local'),
   LOG_LEVEL: z.string().default('info'),
   RATE_LIMIT_DISABLED: bool,
+  /** auth requests (sign-in/up/reset) per IP per minute */
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 });
 
 export interface AppConfig {
@@ -54,7 +56,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     mailFrom: e.MAIL_FROM,
     vapid: { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, subject: e.VAPID_SUBJECT },
     logLevel: e.LOG_LEVEL,
-    rateLimit: { enabled: !e.RATE_LIMIT_DISABLED, authMax: 10, writeMax: 120, globalMax: 600 },
+    rateLimit: { enabled: !e.RATE_LIMIT_DISABLED, authMax: e.AUTH_RATE_LIMIT_MAX, writeMax: 120, globalMax: 600 },
   };
 }
 
