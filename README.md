@@ -201,3 +201,4 @@ Componentes nunca acessam `fetch` ou IndexedDB diretamente — usam as portas de
 - Migração `2026-10-18-profile-visible-hydration-activity` (no serviço `migrate`): torna Água e Atividade
   visíveis nos perfis existentes uma única vez (marcador na coleção `migrations`).
 - Identidade visual: logo e paleta Tropical Punch em `assets/brand` / `apps/web/public/brand`; telas baseadas nos mockups Stitch (`stitch_zelo_sa_de_e_bem_estar/`), sem os cartões de hidratação/refeição e classificações clínicas presentes nos mockups.
+# zelo
