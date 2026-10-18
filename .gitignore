@@ -10,3 +10,5 @@ playwright-report
 test-results
 apps/web/public/sw.js
 apps/web/public/sw.js.map
+next-env.d.ts
+.next-pwa
